@@ -26,6 +26,18 @@ export interface ICurriculumMilestone {
   completionCriteria: string[]
 }
 
+export interface ICurriculumTargetHistory {
+  date: Date
+  completedTopicKeys: string[]
+  missedTopicKeys: string[]
+}
+
+export interface ICurriculumAssessmentHistory {
+  date: Date
+  score?: number
+  notes?: string
+}
+
 export interface ICurriculum {
   owner: Types.ObjectId
   goal: string
@@ -34,6 +46,11 @@ export interface ICurriculum {
   availableStudyTimeMinutesPerDay: number
   targetDurationDays: number
   deadline: Date
+  startDate: Date
+  progressPercent: number
+  completedTopicKeys: string[]
+  targetHistory: ICurriculumTargetHistory[]
+  assessmentHistory: ICurriculumAssessmentHistory[]
   modules: ICurriculumModule[]
   milestones: ICurriculumMilestone[]
   status: CurriculumStatus
@@ -218,6 +235,24 @@ const curriculumMilestoneSchema = new Schema<ICurriculumMilestone>(
   { _id: false }
 )
 
+const curriculumTargetHistorySchema = new Schema<ICurriculumTargetHistory>(
+  {
+    date: { type: Date, required: true },
+    completedTopicKeys: { type: [String], default: [] },
+    missedTopicKeys: { type: [String], default: [] },
+  },
+  { _id: false },
+)
+
+const curriculumAssessmentHistorySchema = new Schema<ICurriculumAssessmentHistory>(
+  {
+    date: { type: Date, required: true },
+    score: { type: Number, min: 0, max: 100 },
+    notes: { type: String, trim: true },
+  },
+  { _id: false },
+)
+
 const curriculumSchema = new Schema<ICurriculum, CurriculumModel>(
   {
     owner: {
@@ -284,6 +319,30 @@ const curriculumSchema = new Schema<ICurriculum, CurriculumModel>(
         message: 'Deadline must be a valid date',
       },
     },
+    startDate: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    progressPercent: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 100,
+      default: 0,
+    },
+    completedTopicKeys: {
+      type: [String],
+      default: [],
+    },
+    targetHistory: {
+      type: [curriculumTargetHistorySchema],
+      default: [],
+    },
+    assessmentHistory: {
+      type: [curriculumAssessmentHistorySchema],
+      default: [],
+    },
     modules: {
       type: [curriculumModuleSchema],
       required: [true, 'At least one curriculum module is required'],
@@ -327,6 +386,8 @@ const curriculumSchema = new Schema<ICurriculum, CurriculumModel>(
   }
 )
 
+curriculumSchema.index({ owner: 1, status: 1, createdAt: -1 })
+
 curriculumSchema.pre('validate', function (next) {
   const now = new Date()
   const durationDeadline = new Date(now)
@@ -334,6 +395,10 @@ curriculumSchema.pre('validate', function (next) {
 
   if (this.deadline <= now) {
     this.invalidate('deadline', 'Deadline must be in the future')
+  }
+
+  if (this.startDate > this.deadline) {
+    this.invalidate('startDate', 'Start date cannot be later than the deadline')
   }
 
   if (this.deadline > durationDeadline) {

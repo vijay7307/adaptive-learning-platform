@@ -8,9 +8,12 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "node --import tsx --test src/services/*.test.ts src/controllers/*.test.ts",
+    "integration:test": "node --import tsx --test src/integration/*.integration.test.ts"
   },
   "dependencies": {
+    "@google/genai": "^2.32.0",
     "adaptive-learning-platform": "file:..",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

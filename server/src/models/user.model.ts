@@ -5,6 +5,7 @@ export interface IUser {
   name: string
   email: string
   passwordHash: string
+  dailyStudyTimeBudgetMinutes: number
   createdAt: Date
   updatedAt: Date
 }
@@ -44,6 +45,13 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
       type: String,
       required: [true, 'Password hash is required'],
       select: false, // Excluded from query results by default for defense in depth
+    },
+    dailyStudyTimeBudgetMinutes: {
+      type: Number,
+      required: true,
+      min: 15,
+      max: 24 * 60,
+      default: 180,
     },
   },
   {

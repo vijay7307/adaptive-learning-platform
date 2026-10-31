@@ -2,11 +2,13 @@ const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/ap
 
 export class ApiError extends Error {
   statusCode: number
+  retryAfterSeconds: number | null
 
-  constructor(message: string, statusCode: number) {
+  constructor(message: string, statusCode: number, retryAfterSeconds: number | null = null) {
     super(message)
     this.name = 'ApiError'
     this.statusCode = statusCode
+    this.retryAfterSeconds = retryAfterSeconds
   }
 }
 
@@ -67,7 +69,13 @@ export async function apiRequest<T>(
       data?.error?.message ||
       data?.message ||
       `Request failed with status ${response.status} (${response.statusText})`
-    throw new ApiError(errorMessage, response.status)
+    const retryAfter = response.headers.get('Retry-After')
+    const retryAfterSeconds = retryAfter ? Number.parseInt(retryAfter, 10) : null
+    throw new ApiError(
+      errorMessage,
+      response.status,
+      Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : null,
+    )
   }
 
   return data as T

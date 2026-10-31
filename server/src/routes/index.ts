@@ -1,6 +1,8 @@
 import { Router } from 'express'
 import { healthRouter } from './health.routes'
 import { authRouter } from './auth.routes'
+import { curriculumRouter } from './curriculum.routes'
+import { dailyTargetRouter } from './daily-target.routes'
 
 export const apiRouter = Router()
 
@@ -9,3 +11,5 @@ apiRouter.use(healthRouter)
 
 // Authentication endpoints: /api/auth/*
 apiRouter.use('/auth', authRouter)
+apiRouter.use('/curriculums', curriculumRouter)
+apiRouter.use('/daily-targets', dailyTargetRouter)
