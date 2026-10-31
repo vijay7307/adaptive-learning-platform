@@ -8,6 +8,8 @@ import {
 } from './ai/contracts'
 import { validateGeneratedCurriculum } from './ai/curriculum.validation'
 import type { GeneratedCurriculum } from './ai/curriculum.types'
+import type { GeneratedLearningNote } from './ai/learning-notes.types'
+import { validateGeneratedLearningNotes } from './ai/learning-notes.validation'
 import { GeminiProvider, type GenerativeModelClient } from './ai/providers/gemini.provider'
 import { OpenAiCompatibleProvider } from './ai/providers/openai-compatible.provider'
 
@@ -139,6 +141,7 @@ export class AiService {
     if (!isNonEmptyString(prompt)) {
       throw new AiServiceError('AI_INVALID_RESPONSE', 'AI prompt must not be empty.')
     }
+
     if (prompt.length > config.aiMaxPromptCharacters) {
       throw new AiServiceError('AI_INVALID_RESPONSE', 'AI prompt exceeds the configured request limit.')
     }
@@ -222,6 +225,45 @@ export class AiService {
       ),
     )
   }
+
+  async generateLearningNotes(prompt: string): Promise<GeneratedLearningNote> {
+    if (!isNonEmptyString(prompt) || prompt.length > config.aiMaxPromptCharacters) {
+      throw new AiServiceError('AI_INVALID_RESPONSE', 'AI notes prompt is invalid.')
+    }
+    if (this.providers.length === 0) {
+      throw new AiServiceError('AI_NOT_CONFIGURED', 'AI service is not configured.')
+    }
+    let lastProviderError: AiProviderError | undefined
+    let providerAttempts = 0
+    for (const [providerIndex, provider] of this.providers.entries()) {
+      if (providerAttempts >= config.aiMaxProviderAttempts) break
+      let providerError: AiProviderError | undefined
+      const remainingProviders = this.providers.length - providerIndex - 1
+      const availableAttempts = config.aiMaxProviderAttempts - providerAttempts - remainingProviders
+      const maxAttempts = Math.min(config.aiMaxRetries + 1, Math.max(1, availableAttempts))
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        providerAttempts += 1
+        try {
+          const response = await provider.generate({ prompt, maxOutputTokens: config.aiMaxOutputTokens })
+          this.lastMetadata = { provider: response.provider, model: response.model, latencyMs: response.latencyMs, usage: response.usage }
+          return validateGeneratedLearningNotes(parseResponse(response.text))
+        } catch (error) {
+          if (error instanceof AiServiceError) throw error
+          if (!(error instanceof AiProviderError)) {
+            throw new AiServiceError('AI_UNAVAILABLE', 'The AI service is temporarily unavailable.', { cause: error })
+          }
+          providerError = error
+          lastProviderError = error
+          if (!isRetryableWithinProvider(error) || attempt === maxAttempts - 1) break
+          await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt))
+        }
+      }
+      if (!providerError || !isFallbackEligible(providerError)) {
+        throw toServiceError(providerError || new AiProviderError('TEMPORARY_FAILURE', 'AI unavailable.', provider.name, provider.model))
+      }
+    }
+    throw toServiceError(lastProviderError || new AiProviderError('TEMPORARY_FAILURE', 'AI unavailable.', config.aiPrimaryProvider, 'unknown'))
+  }
 }
 
 let defaultService: AiService | undefined
@@ -234,6 +276,9 @@ function getDefaultService(): AiService {
 export const aiService = {
   generateCurriculum(prompt: string): Promise<GeneratedCurriculum> {
     return getDefaultService().generateCurriculum(prompt)
+  },
+  generateLearningNotes(prompt: string): Promise<GeneratedLearningNote> {
+    return getDefaultService().generateLearningNotes(prompt)
   },
   getLastGenerationMetadata(): AiGenerationMetadata | undefined {
     return getDefaultService().getLastGenerationMetadata()

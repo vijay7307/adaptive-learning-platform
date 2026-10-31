@@ -12,6 +12,7 @@ let Curriculum: typeof import('../models/curriculum.model').Curriculum
 let DailyTarget: typeof import('../models/daily-target.model').DailyTarget
 let DailyTargetGenerationJob: typeof import('../models/daily-target-generation-job.model').DailyTargetGenerationJob
 let ExtraWorkGeneration: typeof import('../models/extra-work-generation.model').ExtraWorkGeneration
+let LearningNote: typeof import('../models/learning-note.model').LearningNote
 let User: typeof import('../models/user.model').User
 let signAccessToken: typeof import('../utils/jwt').signAccessToken
 let aiService: typeof import('../services/ai.service').aiService
@@ -100,6 +101,27 @@ function generatedCurriculum() {
       completionCriteria: ['Pass'],
     }],
   }
+
+}
+
+function generatedLearningNotes() {
+  return {
+    introduction: 'A focused explanation.',
+    learningObjectives: ['Explain the selected concept.'],
+    prerequisites: ['Variables'],
+    sections: [{
+      title: 'Core idea',
+      explanation: 'A practical explanation.',
+      subtopics: ['Syntax'],
+      examples: ['Build one example.'],
+      codeExamples: [],
+    }],
+    applications: ['Use the concept in a project.'],
+    commonMistakes: ['Skipping validation.'],
+    keyTakeaways: ['Practice the core pattern.'],
+    revisionSummary: 'Review the core pattern.',
+    knowledgeChecks: [{ question: 'What is the core pattern?', answer: 'A reusable pattern.', explanation: 'It is used consistently.' }],
+  }
 }
 
 async function request(path: string, token = user.token, options: RequestInit = {}) {
@@ -120,6 +142,7 @@ before(async () => {
   ({ DailyTarget } = await import('../models/daily-target.model'));
   ({ DailyTargetGenerationJob } = await import('../models/daily-target-generation-job.model'));
   ({ ExtraWorkGeneration } = await import('../models/extra-work-generation.model'));
+  ({ LearningNote } = await import('../models/learning-note.model'));
   ({ User } = await import('../models/user.model'));
   ({ signAccessToken } = await import('../utils/jwt'));
   ({ aiService } = await import('../services/ai.service'));
@@ -129,6 +152,7 @@ before(async () => {
   await Promise.all([
     DailyTargetGenerationJob.deleteMany({}),
     ExtraWorkGeneration.deleteMany({}),
+    LearningNote.deleteMany({}),
     DailyTarget.deleteMany({}),
     Curriculum.deleteMany({}),
     User.deleteMany({}),
@@ -162,6 +186,7 @@ after(async () => {
   await Promise.all([
     DailyTargetGenerationJob.deleteMany({}),
     ExtraWorkGeneration.deleteMany({}),
+    LearningNote.deleteMany({}),
     DailyTarget.deleteMany({}),
     Curriculum.deleteMany({}),
     User.deleteMany({}),
@@ -339,6 +364,7 @@ test('supports undoing regular and extra completion without restoring the daily 
     method: 'PATCH',
     body: JSON.stringify({ status: 'missed' }),
   })
+
   assert.equal(invalid.status, 400)
 
   const undoRegular = await request(`/daily-targets/${target.id}/items/${encodeURIComponent(regularItem.topicKey)}`, user.token, {
@@ -357,4 +383,32 @@ test('supports undoing regular and extra completion without restoring the daily 
   })
   assert.equal(undoExtra.status, 200)
   assert.equal((await ExtraWorkGeneration.findById(generation.id).orFail()).items[0].status, 'pending')
+})
+
+test('creates concurrent note versions, retrieves history, and preserves progress', async () => {
+  const planner = await Curriculum.findOne({ owner: user.id }).orFail()
+  const topic = planner.modules[0].topics[0]
+  const originalProgress = planner.progressPercent
+  const originalCompleted = [...planner.completedTopicKeys]
+  const original = aiService.generateLearningNotes
+  aiService.generateLearningNotes = async () => generatedLearningNotes()
+  try {
+    const responses = await Promise.all([
+      request('/learning-notes/generate', user.token, { method: 'POST', body: JSON.stringify({ curriculumId: planner.id, moduleKey: '1', topicKey: `1:${topic.order}` }) }),
+      request('/learning-notes/generate', user.token, { method: 'POST', body: JSON.stringify({ curriculumId: planner.id, moduleKey: '1', topicKey: `1:${topic.order}`, regenerate: true }) }),
+    ])
+    assert.ok(responses.every((response) => response.status === 201))
+    const notes = await LearningNote.find({ owner: user.id, curriculum: planner._id, moduleKey: '1', topicKey: `1:${topic.order}` }).sort({ version: 1 })
+    assert.equal(notes.length, 2)
+    assert.deepEqual(notes.map((note) => note.version), [1, 2])
+    const history = await request(`/learning-notes?curriculum=${planner.id}`, user.token)
+    assert.equal(history.status, 200)
+    const historyBody = await history.json() as { data: { notes: Array<{ version: number }> } }
+    assert.deepEqual(historyBody.data.notes.map((note) => note.version).sort(), [1, 2])
+    const after = await Curriculum.findById(planner._id).orFail()
+    assert.equal(after.progressPercent, originalProgress)
+    assert.deepEqual(after.completedTopicKeys, originalCompleted)
+  } finally {
+    aiService.generateLearningNotes = original
+  }
 })

@@ -166,3 +166,46 @@ export interface CurriculumDetailResponse {
     curriculum: Curriculum
   }
 }
+
+export interface LearningNoteSection {
+    title: string
+    explanation: string
+    subtopics: string[]
+    examples: string[]
+    codeExamples: Array<{ language: string; code: string; explanation: string; expectedOutput?: string }>
+  }
+
+export interface LearningNoteContent {
+    introduction: string
+    learningObjectives: string[]
+    prerequisites: string[]
+    sections: LearningNoteSection[]
+    applications: string[]
+    commonMistakes: string[]
+    keyTakeaways: string[]
+    revisionSummary: string
+    knowledgeChecks: Array<{ question: string; answer: string; explanation: string }>
+  }
+
+export interface LearningNote {
+    _id: string
+    owner: string
+    curriculum: string
+    moduleKey: string
+    topicKey: string
+    topicTitle: string
+    version: number
+    content: LearningNoteContent
+    createdAt: string
+    updatedAt: string
+  }
+
+export interface LearningNotesListResponse {
+    success: boolean
+    data: { notes: LearningNote[] }
+  }
+
+export interface LearningNoteResponse {
+    success: boolean
+    data: { note: LearningNote; reused?: boolean }
+}
