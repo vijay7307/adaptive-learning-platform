@@ -2,6 +2,7 @@ import { createApp } from './app'
 import { config, validateAuthConfig } from './config/env'
 import { connectDB, disconnectDB } from './config/database'
 import { Server } from 'http'
+import { startDailyTargetScheduler, stopDailyTargetScheduler } from './services/daily-target.scheduler'
 
 let server: Server | null = null
 
@@ -37,6 +38,7 @@ async function startServer(): Promise<void> {
     console.log(`✅ Server successfully listening on port ${config.port}`)
     console.log(`🩺 Health check available at: http://localhost:${config.port}/api/health`)
   })
+  startDailyTargetScheduler()
 }
 
 // Graceful shutdown handler
@@ -51,6 +53,7 @@ async function handleShutdown(signal: string, exitCode = 0): Promise<void> {
       })
     })
   }
+  stopDailyTargetScheduler()
 
   try {
     await disconnectDB()

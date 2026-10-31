@@ -4,6 +4,7 @@ import { Curriculum } from '../models/curriculum.model'
 import { User } from '../models/user.model'
 import { aiService, AiServiceError } from '../services/ai.service'
 import { curriculumJsonInstruction } from '../services/ai/curriculum.prompt'
+import { generateTargetsForNewPlanner } from '../services/daily-target-generation.service'
 
 const MINUTES_PER_DAY = 15
 const MAX_MINUTES_PER_DAY = 24 * 60
@@ -237,7 +238,14 @@ async function generateAndSave(
     })),
     status: 'draft',
   })
-  return curriculum.save()
+  const saved = await curriculum.save()
+  void generateTargetsForNewPlanner(owner, saved).catch((error: unknown) => {
+    console.error('[DailyTargets] New planner target generation failed', {
+      curriculumId: saved._id.toString(),
+      error: error instanceof Error ? error.message : 'unknown error',
+    })
+  })
+  return saved
 }
 
 export async function generateCurriculum(req: Request, res: Response): Promise<void> {

@@ -140,6 +140,7 @@ test('enforces three active planners under concurrent generation requests', asyn
         topics: [{
           title: 'Topic',
           order: 1,
+          description: 'Complete one focused exercise on this topic.',
           learningObjectives: ['Learn'],
           estimatedDurationMinutes: 30,
           completionCriteria: ['Explain'],
@@ -218,6 +219,7 @@ test('prevents cross-user curriculum and daily-target access', async () => {
 })
 
 test('deduplicates concurrent target generation and preserves statuses', async () => {
+  await User.findByIdAndUpdate(userA.id, { dailyStudyTimeBudgetMinutes: 180 })
   await DailyTarget.deleteMany({ owner: userA.id })
   const [first, second] = await Promise.all([
     request('/daily-targets?date=2026-11-01T23:30:00-05:00', userA.token),
@@ -279,6 +281,8 @@ test('creates and enforces the daily-target unique index', async () => {
     owner: userA.id,
     curriculum: curriculum?._id,
     targetDate,
+    localDateKey: '2026-11-04',
+    kind: 'regular',
     items: [],
     allocatedMinutes: 0,
   })
@@ -287,6 +291,8 @@ test('creates and enforces the daily-target unique index', async () => {
       owner: userA.id,
       curriculum: curriculum?._id,
       targetDate,
+      localDateKey: '2026-11-04',
+      kind: 'regular',
       items: [],
       allocatedMinutes: 0,
     }),

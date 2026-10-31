@@ -6,6 +6,7 @@ export interface IUser {
   email: string
   passwordHash: string
   dailyStudyTimeBudgetMinutes: number
+  timezone: string
   createdAt: Date
   updatedAt: Date
 }
@@ -52,6 +53,22 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
       min: 15,
       max: 24 * 60,
       default: 180,
+    },
+    timezone: {
+      type: String,
+      required: true,
+      default: 'Asia/Kolkata',
+      validate: {
+        validator: (value: string) => {
+          try {
+            new Intl.DateTimeFormat('en-US', { timeZone: value }).format()
+            return true
+          } catch {
+            return false
+          }
+        },
+        message: 'Timezone must be a valid IANA timezone.',
+      },
     },
   },
   {

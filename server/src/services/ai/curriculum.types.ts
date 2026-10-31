@@ -14,7 +14,11 @@ export interface GeneratedCurriculum {
     topics: Array<{
       title: string
       order: number
+      description?: string
       learningObjectives: string[]
+      subtopics?: string[]
+      activities?: string[]
+      deliverable?: string
       estimatedDurationMinutes: number
       completionCriteria: string[]
     }>

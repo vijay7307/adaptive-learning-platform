@@ -35,6 +35,7 @@ export const curriculumResponseSchema: Schema = {
               properties: {
                 title: { type: Type.STRING },
                 order: { type: Type.INTEGER },
+                description: { type: Type.STRING },
                 learningObjectives: { type: Type.ARRAY, items: { type: Type.STRING } },
                 estimatedDurationMinutes: { type: Type.INTEGER },
                 completionCriteria: { type: Type.ARRAY, items: { type: Type.STRING } },

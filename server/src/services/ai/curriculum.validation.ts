@@ -75,7 +75,11 @@ export function validateGeneratedCurriculum(value: unknown): GeneratedCurriculum
       return {
         title: topic.title,
         order: topic.order,
+        ...(isNonEmptyString(topic.description) ? { description: topic.description } : {}),
         learningObjectives: topic.learningObjectives,
+        ...(Array.isArray(topic.subtopics) ? { subtopics: topic.subtopics } : {}),
+        ...(Array.isArray(topic.activities) ? { activities: topic.activities } : {}),
+        ...(isNonEmptyString(topic.deliverable) ? { deliverable: topic.deliverable } : {}),
         estimatedDurationMinutes: topic.estimatedDurationMinutes,
         completionCriteria: topic.completionCriteria,
       }

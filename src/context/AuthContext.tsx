@@ -3,10 +3,11 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
   type ReactNode,
 } from 'react'
 import { authService } from '../services/auth.service'
-import { setApiAuthToken } from '../services/api'
+import { getApiAuthToken, setApiAuthToken } from '../services/api'
 import type { UserProfile, LoginCredentials, RegisterCredentials } from '../types/auth'
 
 interface AuthContextType {
@@ -22,10 +23,37 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // In-memory authentication state (not persisted to localStorage per security guidelines)
   const [user, setUser] = useState<UserProfile | null>(null)
-  const [token, setToken] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [token, setToken] = useState<string | null>(() => getApiAuthToken())
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+
+  useEffect(() => {
+    const storedToken = getApiAuthToken()
+    if (!storedToken) {
+      setIsLoading(false)
+      return
+    }
+
+    let active = true
+    void authService.getMe()
+      .then((profileResponse) => {
+        if (!active) return
+        setUser(profileResponse.data.user)
+      })
+      .catch(() => {
+        if (!active) return
+        setUser(null)
+        setToken(null)
+        setApiAuthToken(null)
+      })
+      .finally(() => {
+        if (active) setIsLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const login = useCallback(async (credentials: LoginCredentials): Promise<void> => {
     setIsLoading(true)
@@ -33,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const loginResponse = await authService.login(credentials)
       const accessToken = loginResponse.data.token
 
-      // Store token in memory and configure API client header
+      // Store the token and configure the API client header.
       setToken(accessToken)
       setApiAuthToken(accessToken)
 
@@ -51,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const registerResponse = await authService.register(credentials)
       const accessToken = registerResponse.data.token
 
-      // Store token in memory and configure API client header
+      // Store the token and configure the API client header.
       setToken(accessToken)
       setApiAuthToken(accessToken)
 

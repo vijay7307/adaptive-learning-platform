@@ -12,11 +12,32 @@ export class ApiError extends Error {
   }
 }
 
-// In-memory token storage (kept in memory, never persisted to localStorage)
-let inMemoryToken: string | null = null
+const AUTH_TOKEN_STORAGE_KEY = 'adaptive-learning-auth-token'
+
+function readStoredToken(): string | null {
+  try {
+    return typeof window === 'undefined'
+      ? null
+      : window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+let inMemoryToken: string | null = readStoredToken()
 
 export function setApiAuthToken(token: string | null): void {
   inMemoryToken = token
+  try {
+    if (typeof window === 'undefined') return
+    if (token) {
+      window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token)
+    } else {
+      window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY)
+    }
+  } catch {
+    // Keep the in-memory token usable when browser storage is unavailable.
+  }
 }
 
 export function getApiAuthToken(): string | null {
