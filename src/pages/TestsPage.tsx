@@ -1,19 +1,18 @@
-import { GraduationCap } from 'lucide-react'
-import { PlaceholderPage } from '../components/ui/PlaceholderPage'
+import { useEffect, useState } from 'react'
+import { AlertCircle, GraduationCap, LoaderCircle, RefreshCw } from 'lucide-react'
+import { ApiError } from '../services/api'
+import { testsService } from '../services/tests.service'
+import type { TestAttempt, TestDefinition } from '../types/workspace'
+import { Card, CardBody, CardHeader } from '../components/ui/Card'
+import { EmptyState } from '../components/ui/EmptyState'
 
+const text = (e: unknown) => e instanceof ApiError || e instanceof Error ? e.message : 'Unable to load tests.'
 export function TestsPage() {
-  return (
-    <PlaceholderPage
-      icon={GraduationCap}
-      title="Test Center"
-      description="Take full-length mock tests and topic-specific mini-tests crafted by AI to simulate your real exam. Get instant results with detailed analysis."
-      features={[
-        'Full-length mock tests matching your exam pattern',
-        'Topic-wise quick tests (15–30 questions) for focused practice',
-        'Timed test environment with countdown and auto-submission',
-        'Post-test analytics: time per question, accuracy by topic',
-        'Comparison with top-performing peers on the leaderboard',
-      ]}
-    />
-  )
+  const [tests, setTests] = useState<TestDefinition[]>([]); const [attempts, setAttempts] = useState<TestAttempt[]>([])
+  const [loading, setLoading] = useState(true); const [starting, setStarting] = useState<string | null>(null); const [error, setError] = useState<string | null>(null)
+  async function load() { setLoading(true); setError(null); try { const [catalog, history] = await Promise.all([testsService.list(), testsService.attempts()]); setTests(catalog.data?.tests || []); setAttempts(history.data?.attempts || []) } catch (e) { setError(text(e)) } finally { setLoading(false) } }
+  useEffect(() => { void load() }, [])
+  async function start(testKey: string) { setStarting(testKey); setError(null); try { await testsService.start(testKey); void load() } catch (e) { setError(text(e)) } finally { setStarting(null) } }
+  if (loading) return <div className="flex items-center gap-2 p-8 text-sm text-slate-500"><LoaderCircle className="animate-spin" size={18} />Loading tests…</div>
+  return <div className="mx-auto max-w-5xl space-y-6"><div><h1 className="text-2xl font-bold text-slate-800">Test center</h1><p className="mt-1 text-sm text-slate-500">Take assessments from your active learning plan and track real results.</p></div>{error && <div className="flex justify-between rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><span><AlertCircle className="mr-2 inline" size={16} />{error}</span><button onClick={() => void load()}><RefreshCw size={16} /></button></div>}<div className="grid gap-5 lg:grid-cols-2"><Card><CardHeader title="Available tests" /><CardBody className="space-y-3">{tests.length ? tests.map(test => <div key={test.testKey} className="flex items-center justify-between rounded-lg border border-slate-100 p-3"><div><p className="text-sm font-semibold text-slate-700">{test.title}</p><p className="mt-1 text-xs text-slate-500">{test.questionCount ? `${test.questionCount} questions` : 'Assessment'}{test.durationMinutes ? ` · ${test.durationMinutes} min` : ''}</p>{test.description && <p className="mt-1 text-xs text-slate-500">{test.description}</p>}</div><button disabled={starting === test.testKey} onClick={() => void start(test.testKey)} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white">{starting === test.testKey ? 'Starting…' : 'Start'}</button></div>) : <EmptyState icon={GraduationCap} title="No tests available" description="Tests will appear when your learning plan has assessments." />}</CardBody></Card><Card><CardHeader title="Results" /><CardBody className="space-y-3">{attempts.length ? attempts.map(attempt => <div key={attempt.attemptKey} className="flex justify-between border-b border-slate-100 pb-3 text-sm"><span>{new Date(attempt.startedAt).toLocaleDateString()} · {attempt.status || 'submitted'}</span><strong>{attempt.scorePercent == null ? 'Pending' : `${attempt.scorePercent}%`}</strong></div>) : <EmptyState icon={GraduationCap} title="No results yet" description="Completed tests and scores will appear here." />}</CardBody></Card></div></div>
 }

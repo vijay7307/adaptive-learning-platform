@@ -6,10 +6,10 @@ repository and is intended to prevent a full repository scan before work begins.
 ## Current checkout
 
 - Repository: `C:\Users\Vijay ahirwar\Desktop\adaptive-learning-platform`
-- Branch: `feat/notes`
-- Current HEAD: `fadd8b4 feat : add learning notes`
+- Branch: `feat/remaining`
+- Current HEAD: see `git log -1`; this handoff tracks the integrated remaining-workspace implementation.
 - Runtime: Windows, Node.js, npm, TypeScript
-- Worktree was clean when this handoff was created.
+- The worktree may contain generated integration-test database files; remove them after testing.
 
 ## Product
 
@@ -66,7 +66,7 @@ Express/Mongoose.
 - `src/components/` - layout, auth, and reusable UI.
 - `src/pages/` - dashboard, planner, targets, notes, practice, feedback, tests, analytics,
   settings, auth, and not-found pages.
-- `src/data/mockData.ts` - static dashboard data still used by dashboard widgets.
+- `src/data/mockData.ts` - legacy data module; the Dashboard now uses live curriculum, target, and practice APIs.
 
 Current frontend routes:
 
@@ -93,6 +93,11 @@ Current frontend routes:
 - `server/src/routes/curriculum.routes.ts` - curriculum generation/list/retrieval/progress.
 - `server/src/routes/daily-target.routes.ts` - Daily Targets and Extra Work.
 - `server/src/routes/learning-notes.routes.ts` - Learning Notes operations.
+- `server/src/routes/practice.routes.ts` - Practice generation, attempts, evaluation, and weak topics.
+- `server/src/routes/daily-feedback.routes.ts` - Daily feedback CRUD and summaries.
+- `server/src/routes/shared-learning-context.routes.ts` - bounded persisted learner context.
+- `server/src/routes/test.routes.ts` - Test Center generation, attempts, evaluation, history, and results.
+- `server/src/routes/settings.routes.ts` - profile, preferences, and password updates.
 
 ### Backend controllers
 
@@ -100,6 +105,11 @@ Current frontend routes:
 - `server/src/controllers/curriculum.controller.ts`
 - `server/src/controllers/daily-target.controller.ts`
 - `server/src/controllers/learning-notes.controller.ts`
+- `server/src/controllers/practice.controller.ts`
+- `server/src/controllers/daily-feedback.controller.ts`
+- `server/src/controllers/shared-learning-context.controller.ts`
+- `server/src/controllers/test.controller.ts`
+- `server/src/controllers/settings.controller.ts`
 
 ### Backend models
 
@@ -110,6 +120,10 @@ Current frontend routes:
 - `server/src/models/daily-target-generation-job.model.ts` - scheduled generation state.
 - `server/src/models/extra-work-generation.model.ts` - per-day Extra Work allowance.
 - `server/src/models/learning-note.model.ts` - versioned notes with compound uniqueness.
+- `server/src/models/practice-set.model.ts`, `practice-attempt.model.ts`,
+  `learner-practice-signal.model.ts` - Practice contracts and historical evaluation evidence.
+- `server/src/models/daily-feedback.model.ts` - persisted learner check-ins.
+- `server/src/models/test.model.ts`, `test-attempt.model.ts` - Test Center definitions and attempts.
 
 ### AI services
 
@@ -143,6 +157,15 @@ Current frontend routes:
    completion/undo behavior, and Extra Work rules.
 6. Learning Notes with structured AI content, ownership checks, latest-version reuse, explicit
    regeneration, historical versions, and concurrent version allocation.
+7. Practice & Solutions API and responsive workspace, including exact answer coverage, deterministic
+   MCQ scoring, AI descriptive evaluation, signal reconciliation, leases, and claim-token safety.
+8. Daily Feedback persistence, history, bounded summaries, and curriculum/target ownership checks.
+9. Shared Learning Context retrieval from persisted curriculum, targets, practice, feedback, and
+   test records.
+10. Test Center models, generation, timed/interrupted attempts, backend evaluation, results, and history.
+11. Settings persistence for profile, learning preferences, timezone, study budget, notifications,
+   theme, and password changes.
+12. Dashboard live data for curricula, daily targets, and Practice history.
 
 ## API currently mounted
 
@@ -153,6 +176,11 @@ Current frontend routes:
 - Curriculum routes under `/api/curriculums`
 - Daily Target routes under `/api/daily-targets`
 - Learning Notes routes under `/api/learning-notes`
+- Practice routes under `/api/practice`
+- Daily Feedback routes under `/api/daily-feedback`
+- Shared context routes under `/api/shared-learning-context`
+- Test Center routes under `/api/tests`
+- Settings routes under `/api/settings`
 
 All protected operations use authenticated owner-scoped queries. Do not trust owner IDs from
 frontend input.
@@ -210,9 +238,8 @@ for integration tests and remove the temporary data directory afterward.
 
 Practice Phase 1 and Phase 2 contracts/models/services were developed in a later working context,
 including PracticeSet, PracticeAttempt, LearnerPracticeSignal, scoring, lifecycle, DTO, validation,
-weak-topic utilities, and a Phase 3 Practice Service. However, those files are **not present in
-the current `feat/notes` checkout** listed above. Do not assume they exist; verify the branch
-before continuing Practice work.
+weak-topic utilities, and a Phase 3 Practice Service. Those files are present in the current
+`feat/remaining` checkout. Verify the branch before continuing Practice work.
 
 The later Practice design requirements were:
 
@@ -230,8 +257,8 @@ The later Practice design requirements were:
 2. Read this file, then inspect only the specific files relevant to the requested task.
 3. Preserve existing authentication, curriculum, Daily Targets, Learning Notes, and AI provider
    abstractions.
-4. Do not add controllers, routes, models, or frontend changes unless the task explicitly asks.
-5. Run the smallest relevant tests, then the backend/frontend checks required by the task.
+4. Preserve the completed workspace integrations unless the task explicitly asks for changes.
+5. Run focused tests first, then the backend/frontend checks required by the task.
 
 ## Irrelevant or stale files
 
@@ -241,6 +268,8 @@ The later Practice design requirements were:
 - The user-attached read-only PracticeSet snapshot is not a workspace file and must not be edited.
 - `PROJECT_CONTEXT.md` and parts of `README.md` describe earlier repository states; use this file
   and the actual checkout as the current source of truth.
+- `src/pages/AnalyticsPage.tsx` still uses the existing `PlaceholderPage`; Analytics is outside the
+  six requested workspaces and was not replaced in this batch.
 - `dist/` and `node_modules/` are generated/dependency directories; do not edit or treat them as
   application source.
 
@@ -248,5 +277,5 @@ The later Practice design requirements were:
 
 This file preserves project progress, architecture, commands, branch context, and known
 limitations across sessions. It cannot preserve model tokens or conversation context; a new
-session still has its own token budget. Commit this file if it must follow the project across
-branches or clones.
+session still has its own token budget. It is repository-scoped and should be kept updated when
+feature work changes the architecture.

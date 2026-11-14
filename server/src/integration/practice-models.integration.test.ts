@@ -260,73 +260,6 @@ test('blocks document mutation using persisted status while preserving submitted
     questionResults: [{ questionKey: 'q1', submittedAnswer: 'a', score: 0, maxScore: 2, correctness: 'incorrect', feedback: 'No', mistakes: [], suggestedRevisionTopics: [] }],
   })
 
-  test('prevents an expired evaluator from overwriting a reclaimed evaluation lease', async () => {
-    const user = await User.findOne({ email: 'practice-models@example.com' }).orFail()
-    const curriculum = await Curriculum.findOne({ owner: user._id }).orFail()
-    const set = await PracticeSet.findOne({ owner: user._id }).orFail()
-    const attempt = await PracticeAttempt.create({
-      attemptKey: 'lease-token-attempt',
-      owner: user._id,
-      curriculum: curriculum._id,
-      practiceSet: set._id,
-      status: 'submitted',
-      answers: [{ questionKey: 'q1', answer: 'a' }],
-      totalPoints: 2,
-      earnedPoints: 0,
-      scorePercent: 0,
-      startedAt: new Date(),
-      submittedAt: new Date(),
-    })
-    const expiredAt = new Date(Date.now() - 10 * 60 * 1000)
-    await PracticeAttempt.updateOne(
-      { _id: attempt._id, status: 'submitted' },
-      { $set: { status: 'evaluating', evaluationClaimedAt: expiredAt, evaluationClaimToken: 'claim-a' } },
-    )
-    const reclaimed = await PracticeAttempt.findOneAndUpdate(
-      { _id: attempt._id, status: 'evaluating', evaluationClaimedAt: { $lt: new Date(Date.now() - 5 * 60 * 1000) } },
-      { $set: { evaluationClaimedAt: new Date(), evaluationClaimToken: 'claim-b' } },
-      { new: true },
-    ).select('+evaluationClaimToken')
-    assert.equal(reclaimed?.evaluationClaimToken, 'claim-b')
-
-    const staleCompletion = await PracticeAttempt.findOneAndUpdate(
-      { _id: attempt._id, status: 'evaluating', evaluationClaimToken: 'claim-a' },
-      { $set: { status: 'evaluated' } },
-      { new: true },
-    )
-    const staleFailure = await PracticeAttempt.updateOne(
-      { _id: attempt._id, status: 'evaluating', evaluationClaimToken: 'claim-a' },
-      { $set: { status: 'failed' } },
-    )
-    assert.equal(staleCompletion, null)
-    assert.equal(staleFailure.matchedCount, 0)
-
-    const completed = await PracticeAttempt.findOneAndUpdate(
-      { _id: attempt._id, status: 'evaluating', evaluationClaimToken: 'claim-b' },
-      {
-        $set: {
-          status: 'evaluated',
-          evaluatedAt: new Date(),
-          questionResults: [{
-            questionKey: 'q1',
-            submittedAnswer: 'a',
-            score: 2,
-            maxScore: 2,
-            correctness: 'correct',
-            feedback: 'Correct.',
-            mistakes: [],
-            suggestedRevisionTopics: [],
-          }],
-          earnedPoints: 2,
-          scorePercent: 100,
-        },
-        $unset: { evaluationClaimedAt: 1, evaluationClaimToken: 1 },
-      },
-      { new: true },
-    )
-    assert.equal(completed?.status, 'evaluated')
-    assert.equal(completed?.evaluationClaimToken, undefined)
-  })
   evaluated.answers = [{ questionKey: 'q1', answer: 'changed' }]
   await assert.rejects(() => evaluated.save(), /Evaluated practice attempts are immutable/)
   const evaluatedToFailed = await PracticeAttempt.findOne({ attemptKey: 'evaluated-immutable' }).orFail()
@@ -334,6 +267,74 @@ test('blocks document mutation using persisted status while preserving submitted
   evaluatedToFailed.evaluatedAt = undefined
   evaluatedToFailed.answers = [{ questionKey: 'q1', answer: 'changed' }]
   await assert.rejects(() => evaluatedToFailed.save(), /Evaluated practice attempts are immutable/)
+})
+
+test('prevents an expired evaluator from overwriting a reclaimed evaluation lease', async () => {
+  const user = await User.findOne({ email: 'practice-models@example.com' }).orFail()
+  const curriculum = await Curriculum.findOne({ owner: user._id }).orFail()
+  const set = await PracticeSet.findOne({ owner: user._id }).orFail()
+  const attempt = await PracticeAttempt.create({
+    attemptKey: 'lease-token-attempt',
+    owner: user._id,
+    curriculum: curriculum._id,
+    practiceSet: set._id,
+    status: 'submitted',
+    answers: [{ questionKey: 'q1', answer: 'a' }],
+    totalPoints: 2,
+    earnedPoints: 0,
+    scorePercent: 0,
+    startedAt: new Date(),
+    submittedAt: new Date(),
+  })
+  const expiredAt = new Date(Date.now() - 10 * 60 * 1000)
+  await PracticeAttempt.updateOne(
+    { _id: attempt._id, status: 'submitted' },
+    { $set: { status: 'evaluating', evaluationClaimedAt: expiredAt, evaluationClaimToken: 'claim-a' } },
+  )
+  const reclaimed = await PracticeAttempt.findOneAndUpdate(
+    { _id: attempt._id, status: 'evaluating', evaluationClaimedAt: { $lt: new Date(Date.now() - 5 * 60 * 1000) } },
+    { $set: { evaluationClaimedAt: new Date(), evaluationClaimToken: 'claim-b' } },
+    { new: true },
+  ).select('+evaluationClaimToken')
+  assert.equal(reclaimed?.evaluationClaimToken, 'claim-b')
+
+  const staleCompletion = await PracticeAttempt.findOneAndUpdate(
+    { _id: attempt._id, status: 'evaluating', evaluationClaimToken: 'claim-a' },
+    { $set: { status: 'evaluated' } },
+    { new: true },
+  )
+  const staleFailure = await PracticeAttempt.updateOne(
+    { _id: attempt._id, status: 'evaluating', evaluationClaimToken: 'claim-a' },
+    { $set: { status: 'failed' } },
+  )
+  assert.equal(staleCompletion, null)
+  assert.equal(staleFailure.matchedCount, 0)
+
+  const completed = await PracticeAttempt.findOneAndUpdate(
+    { _id: attempt._id, status: 'evaluating', evaluationClaimToken: 'claim-b' },
+    {
+      $set: {
+        status: 'evaluated',
+        evaluatedAt: new Date(),
+        questionResults: [{
+          questionKey: 'q1',
+          submittedAnswer: 'a',
+          score: 2,
+          maxScore: 2,
+          correctness: 'correct',
+          feedback: 'Correct.',
+          mistakes: [],
+          suggestedRevisionTopics: [],
+        }],
+        earnedPoints: 2,
+        scorePercent: 100,
+      },
+      $unset: { evaluationClaimedAt: 1, evaluationClaimToken: 1 },
+    },
+    { new: true },
+  )
+  assert.equal(completed?.status, 'evaluated')
+  assert.equal(completed?.evaluationClaimToken, undefined)
 })
 
 test('normalizes and deduplicates learner signal concepts', async () => {

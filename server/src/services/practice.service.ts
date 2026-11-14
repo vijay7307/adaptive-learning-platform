@@ -309,7 +309,16 @@ export class PracticeService {
   }
 
   async createAttempt(owner: OwnerId, input: CreateAttemptInput): Promise<PublicPracticeAttempt> {
-    const set = await PracticeSet.findOne({ _id: requireObjectId(input.practiceSetId, 'practiceSetId'), owner })
+    const setId = mongoose.Types.ObjectId.isValid(input.practiceSetId)
+      ? new mongoose.Types.ObjectId(input.practiceSetId)
+      : null
+    const set = await PracticeSet.findOne({
+      owner,
+      $or: [
+        ...(setId ? [{ _id: setId }] : []),
+        { setKey: input.practiceSetId },
+      ],
+    })
     if (!set) throw new PracticeServiceError('NOT_FOUND', 'Practice set not found.')
     const totalPoints = set.questions.reduce((total, question) => total + question.points, 0)
     const attempt = await PracticeAttempt.create({
@@ -326,6 +335,13 @@ export class PracticeService {
       startedAt: new Date(),
     })
     return toPublicAttempt(asAttemptContract(attempt))
+  }
+
+  async listAttempts(owner: OwnerId, curriculumId?: string): Promise<PublicPracticeAttempt[]> {
+    const filter: Record<string, unknown> = { owner }
+    if (curriculumId) filter.curriculum = requireObjectId(curriculumId, 'curriculumId')
+    const attempts = await PracticeAttempt.find(filter).sort({ createdAt: -1 })
+    return attempts.map((attempt) => toPublicAttempt(asAttemptContract(attempt)))
   }
 
   async getAttempt(owner: OwnerId, attemptKey: string): Promise<PublicPracticeAttempt> {

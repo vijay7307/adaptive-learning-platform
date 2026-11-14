@@ -1,19 +1,20 @@
-import { Settings } from 'lucide-react'
-import { PlaceholderPage } from '../components/ui/PlaceholderPage'
+import { useEffect, useState } from 'react'
+import { AlertCircle, LoaderCircle, Save } from 'lucide-react'
+import { ApiError } from '../services/api'
+import { settingsService } from '../services/settings.service'
+import { useAuth } from '../context/AuthContext'
+import type { UserProfile } from '../types/auth'
+import { Card, CardBody, CardHeader } from '../components/ui/Card'
 
+const errorText = (e: unknown) => e instanceof ApiError || e instanceof Error ? e.message : 'Unable to load settings.'
 export function SettingsPage() {
-  return (
-    <PlaceholderPage
-      icon={Settings}
-      title="Settings"
-      description="Customize your learning experience: update your profile, set daily study hour goals, notification preferences, and manage your AI configuration."
-      features={[
-        'Update your profile: name, exam goal, and target date',
-        'Set daily study hour targets and reminder notifications',
-        'Choose preferred subjects and difficulty levels',
-        'Theme selection: light, dark, and system default',
-        'Manage data export and account preferences',
-      ]}
-    />
-  )
+  const { user } = useAuth()
+  const [profile, setProfile] = useState<Partial<UserProfile>>({ name: user?.name || '', email: user?.email || '', timezone: user?.timezone || '' })
+  const [currentPassword, setCurrentPassword] = useState(''); const [newPassword, setNewPassword] = useState('')
+  const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [passwordSaving, setPasswordSaving] = useState(false); const [error, setError] = useState<string | null>(null); const [notice, setNotice] = useState('')
+  useEffect(() => { void settingsService.get().then(response => setProfile(response.data.settings)).catch(e => setError(errorText(e))).finally(() => setLoading(false)) }, [])
+  async function saveProfile(e: React.FormEvent) { e.preventDefault(); setSaving(true); setError(null); setNotice(''); try { const response = await settingsService.updateProfile({ name: profile.name, email: profile.email, timezone: profile.timezone }); setProfile(response.data.settings); setNotice('Profile updated.') } catch (e) { setError(errorText(e)) } finally { setSaving(false) } }
+  async function savePassword(e: React.FormEvent) { e.preventDefault(); setPasswordSaving(true); setError(null); setNotice(''); try { await settingsService.updatePassword(currentPassword, newPassword); setCurrentPassword(''); setNewPassword(''); setNotice('Password updated.') } catch (e) { setError(errorText(e)) } finally { setPasswordSaving(false) } }
+  if (loading) return <div className="flex items-center gap-2 p-8 text-sm text-slate-500"><LoaderCircle className="animate-spin" size={18} />Loading settings…</div>
+  return <div className="mx-auto max-w-3xl space-y-6"><div><h1 className="text-2xl font-bold text-slate-800">Settings</h1><p className="mt-1 text-sm text-slate-500">Manage your profile and account security.</p></div>{error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><AlertCircle className="mr-2 inline" size={16} />{error}</div>}{notice && <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</p>}<Card><CardHeader title="Profile" /><CardBody><form onSubmit={saveProfile} className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-medium text-slate-700">Name<input required className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 font-normal" value={profile.name || ''} onChange={e => setProfile({ ...profile, name: e.target.value })} /></label><label className="text-sm font-medium text-slate-700">Email<input required type="email" className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 font-normal" value={profile.email || ''} onChange={e => setProfile({ ...profile, email: e.target.value })} /></label><label className="text-sm font-medium text-slate-700 sm:col-span-2">Timezone<input className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 font-normal" value={profile.timezone || ''} onChange={e => setProfile({ ...profile, timezone: e.target.value })} placeholder="Asia/Kolkata" /></label><button disabled={saving} className="flex w-fit items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white"><Save size={16} />{saving ? 'Saving…' : 'Save profile'}</button></form></CardBody></Card><Card><CardHeader title="Change password" /><CardBody><form onSubmit={savePassword} className="max-w-md space-y-4"><input required type="password" minLength={8} placeholder="Current password" className="w-full rounded-lg border border-slate-200 p-2.5 text-sm" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} /><input required type="password" minLength={8} placeholder="New password (8+ characters)" className="w-full rounded-lg border border-slate-200 p-2.5 text-sm" value={newPassword} onChange={e => setNewPassword(e.target.value)} /><button disabled={passwordSaving} className="rounded-lg border border-indigo-200 px-4 py-2 text-sm font-medium text-indigo-700">{passwordSaving ? 'Updating…' : 'Update password'}</button></form></CardBody></Card></div>
 }

@@ -1,19 +1,24 @@
-import { MessageSquare } from 'lucide-react'
-import { PlaceholderPage } from '../components/ui/PlaceholderPage'
+import { useEffect, useState } from 'react'
+import { AlertCircle, LoaderCircle, MessageSquare, RefreshCw } from 'lucide-react'
+import { ApiError } from '../services/api'
+import { feedbackService } from '../services/feedback.service'
+import { curriculumService } from '../services/curriculum.service'
+import type { FeedbackEntry } from '../types/workspace'
+import { Card, CardBody, CardHeader } from '../components/ui/Card'
+import { EmptyState } from '../components/ui/EmptyState'
+
+const errorText = (e: unknown) => e instanceof ApiError || e instanceof Error ? e.message : 'Unable to load feedback.'
+const Rating = ({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) => <label className="block text-sm font-medium text-slate-700">{label}<select value={value} onChange={e => onChange(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm"><option value={1}>1 — Very low</option><option value={2}>2</option><option value={3}>3 — Okay</option><option value={4}>4</option><option value={5}>5 — Excellent</option></select></label>
 
 export function FeedbackPage() {
-  return (
-    <PlaceholderPage
-      icon={MessageSquare}
-      title="Daily Feedback"
-      description="At the end of each day, the AI reviews your study session — what went well, what to improve, and what to prioritize tomorrow."
-      features={[
-        'End-of-day AI report: strengths, weaknesses, and improvement areas',
-        'Compare today vs yesterday to track momentum',
-        "Actionable suggestions for tomorrow's study plan",
-        'Motivational nudges and consistency analysis',
-        'Weekly digest email with key performance highlights',
-      ]}
-    />
-  )
+  const [history, setHistory] = useState<FeedbackEntry[]>([])
+  const [curriculumId, setCurriculumId] = useState('')
+  const [form, setForm] = useState<Omit<FeedbackEntry, '_id' | 'createdAt'>>({ difficulty: 3, confidence: 3, workload: 3, completedWork: [], blockers: [], topics: [] })
+  const [completedWork, setCompletedWork] = useState(''); const [blockers, setBlockers] = useState(''); const [topics, setTopics] = useState('')
+  const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null); const [saved, setSaved] = useState(false)
+  async function load() { setLoading(true); setError(null); try { const [response, plans] = await Promise.all([feedbackService.list(), curriculumService.list()]); setHistory(response.data?.feedback || []); setCurriculumId(plans.data.curricula.find(plan => plan.status === 'active' || plan.status === 'draft')?._id || '') } catch (e) { setError(errorText(e)) } finally { setLoading(false) } }
+  useEffect(() => { void load() }, [])
+  async function submit(e: React.FormEvent) { e.preventDefault(); if (!curriculumId) { setError('Create a learning plan before submitting feedback.'); return } setSaving(true); setError(null); try { await feedbackService.create({ ...form, curriculumId, completedWork: completedWork.split('\n').map(x => x.trim()).filter(Boolean), blockers: blockers.split('\n').map(x => x.trim()).filter(Boolean), topics: topics.split(',').map(x => x.trim()).filter(Boolean) }); setSaved(true); setCompletedWork(''); setBlockers(''); setTopics(''); void load() } catch (e) { setError(errorText(e)) } finally { setSaving(false) } }
+  if (loading) return <div className="flex items-center gap-2 p-8 text-sm text-slate-500"><LoaderCircle className="animate-spin" size={18} />Loading feedback…</div>
+  return <div className="mx-auto max-w-5xl space-y-6"><div><h1 className="text-2xl font-bold text-slate-800">Daily feedback</h1><p className="mt-1 text-sm text-slate-500">Share how today’s learning felt so your plan can improve.</p></div>{error && <div className="flex justify-between rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><span><AlertCircle className="mr-2 inline" size={16} />{error}</span><button onClick={() => void load()}><RefreshCw size={16} /></button></div>}<div className="grid gap-5 lg:grid-cols-2"><Card><CardHeader title="Check in" /><CardBody><form onSubmit={submit} className="space-y-4"><div className="grid gap-3 sm:grid-cols-3"><Rating label="Difficulty" value={form.difficulty} onChange={difficulty => setForm({ ...form, difficulty })} /><Rating label="Confidence" value={form.confidence} onChange={confidence => setForm({ ...form, confidence })} /><Rating label="Workload" value={form.workload} onChange={workload => setForm({ ...form, workload })} /></div><textarea className="w-full rounded-lg border border-slate-200 p-3 text-sm" rows={3} value={completedWork} onChange={e => setCompletedWork(e.target.value)} placeholder="What did you complete? One item per line" /><textarea className="w-full rounded-lg border border-slate-200 p-3 text-sm" rows={2} value={blockers} onChange={e => setBlockers(e.target.value)} placeholder="Any blockers? One per line" /><input className="w-full rounded-lg border border-slate-200 p-3 text-sm" value={topics} onChange={e => setTopics(e.target.value)} placeholder="Topics covered (comma separated)" /><button disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{saving ? 'Saving…' : 'Save feedback'}</button>{saved && <p className="text-sm text-emerald-600">Feedback saved.</p>}</form></CardBody></Card><Card><CardHeader title="Previous check-ins" /><CardBody className="space-y-3">{history.length ? history.map((entry, index) => <div key={entry._id || `${entry.createdAt}-${index}`} className="rounded-lg border border-slate-100 p-3 text-sm"><div className="flex justify-between font-medium text-slate-700"><span>{entry.feedbackDate ? new Date(entry.feedbackDate).toLocaleDateString() : 'Recent check-in'}</span><span>Confidence {entry.confidence}/5</span></div><p className="mt-1 text-xs text-slate-500">{entry.topics.join(', ') || 'No topics recorded'}</p></div>) : <EmptyState icon={MessageSquare} title="No feedback yet" description="Your check-ins will appear here." />}</CardBody></Card></div></div>
 }

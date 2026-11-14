@@ -7,6 +7,15 @@ export interface IUser {
   passwordHash: string
   dailyStudyTimeBudgetMinutes: number
   timezone: string
+  learningPreferences: {
+    preferredSessionMinutes: number
+    difficulty: 'beginner' | 'intermediate' | 'advanced'
+  }
+  notifications: {
+    email: boolean
+    dailyReminders: boolean
+  }
+  theme: 'light' | 'dark' | 'system'
   createdAt: Date
   updatedAt: Date
 }
@@ -70,6 +79,15 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
         message: 'Timezone must be a valid IANA timezone.',
       },
     },
+    learningPreferences: {
+      preferredSessionMinutes: { type: Number, min: 5, max: 240, default: 45 },
+      difficulty: { type: String, enum: ['beginner', 'intermediate', 'advanced'], default: 'beginner' },
+    },
+    notifications: {
+      email: { type: Boolean, default: true },
+      dailyReminders: { type: Boolean, default: true },
+    },
+    theme: { type: String, enum: ['light', 'dark', 'system'], default: 'system' },
   },
   {
     timestamps: true,
