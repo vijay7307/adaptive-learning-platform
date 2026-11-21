@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, BookOpen, ChevronDown, ChevronRight, LoaderCircle, Sparkles } from 'lucide-react'
+import { AlertCircle, BookOpen, ChevronDown, ChevronRight, ExternalLink, LoaderCircle, Sparkles, Youtube } from 'lucide-react'
 import { ApiError } from '../services/api'
 import { curriculumService } from '../services/curriculum.service'
 import { learningNotesService } from '../services/learning-notes.service'
@@ -45,6 +45,33 @@ function NoteContent({ note }: { note: LearningNote }) {
       <section><h3 className="font-semibold text-slate-900">Common mistakes</h3><ul className="mt-2 list-disc space-y-1 pl-5">{content.commonMistakes.map((item) => <li key={item}>{item}</li>)}</ul></section>
       <section><h3 className="font-semibold text-slate-900">Key takeaways</h3><ul className="mt-2 list-disc space-y-1 pl-5">{content.keyTakeaways.map((item) => <li key={item}>{item}</li>)}</ul></section>
       <section><h3 className="font-semibold text-slate-900">Revision summary</h3><p className="mt-2">{content.revisionSummary}</p></section>
+      {content.resources && content.resources.length > 0 && (
+        <section>
+          <h3 className="font-semibold text-slate-900">Learn more</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {content.resources.map((resource) => (
+              <a
+                key={`${resource.type}-${resource.url}`}
+                href={resource.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg border border-slate-200 p-3 transition hover:border-indigo-300 hover:bg-indigo-50"
+              >
+                <div className="flex items-start gap-2">
+                  {resource.type === 'youtube'
+                    ? <Youtube className="mt-0.5 shrink-0 text-red-500" size={18} />
+                    : <ExternalLink className="mt-0.5 shrink-0 text-indigo-500" size={18} />}
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-900">{resource.title}</p>
+                    <p className="mt-1 text-xs capitalize text-slate-500">{resource.type}</p>
+                    {resource.description && <p className="mt-1 text-xs text-slate-600">{resource.description}</p>}
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
       <section><h3 className="font-semibold text-slate-900">Knowledge checks</h3><div className="mt-2 space-y-3">{content.knowledgeChecks.map((check) => <div key={check.question} className="rounded-lg bg-slate-50 p-3"><p className="font-medium">{check.question}</p><p className="mt-1 text-emerald-700">Answer: {check.answer}</p><p className="mt-1 text-xs text-slate-500">{check.explanation}</p></div>)}</div></section>
     </div>
   )

@@ -31,3 +31,24 @@ test('rejects malformed learning notes', () => {
     (error: unknown) => error instanceof AiServiceError && error.code === 'AI_INVALID_RESPONSE',
   )
 })
+
+test('validates YouTube and additional learning resources', () => {
+  const result = validateGeneratedLearningNotes({
+    ...valid,
+    resources: [
+      { title: 'Topic video', url: 'https://www.youtube.com/watch?v=example', type: 'youtube', description: 'A focused walkthrough.' },
+      { title: 'Official reference', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript', type: 'documentation' },
+    ],
+  })
+  assert.equal(result.resources?.length, 2)
+})
+
+test('rejects unsafe or malformed learning resource URLs', () => {
+  assert.throws(
+    () => validateGeneratedLearningNotes({
+      ...valid,
+      resources: [{ title: 'Unsafe video', url: 'javascript:alert(1)', type: 'youtube' }],
+    }),
+    (error: unknown) => error instanceof AiServiceError && error.code === 'AI_INVALID_RESPONSE',
+  )
+})

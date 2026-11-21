@@ -23,4 +23,10 @@ export interface GeneratedLearningNote {
     answer: string
     explanation: string
   }>
+  resources?: Array<{
+    title: string
+    url: string
+    type: 'youtube' | 'article' | 'documentation' | 'course' | 'practice'
+    description?: string
+  }>
 }

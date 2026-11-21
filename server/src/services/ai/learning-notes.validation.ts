@@ -13,6 +13,23 @@ function isTextArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.length > 0 && value.every(isText)
 }
 
+const resourceTypes = new Set(['youtube', 'article', 'documentation', 'course', 'practice'])
+
+function isSafeResourceUrl(value: unknown, type: string): value is string {
+  if (typeof value !== 'string') return false
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:') return false
+    if (type === 'youtube') {
+      return url.hostname === 'youtube.com' || url.hostname.endsWith('.youtube.com') ||
+        url.hostname === 'youtu.be'
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function validateGeneratedLearningNotes(value: unknown): GeneratedLearningNote {
   if (!isRecord(value) ||
     !isText(value.introduction) ||
@@ -67,6 +84,28 @@ export function validateGeneratedLearningNotes(value: unknown): GeneratedLearnin
     return { question: check.question, answer: check.answer, explanation: check.explanation }
   })
 
+  let resources: GeneratedLearningNote['resources']
+  if (value.resources !== undefined) {
+    if (!Array.isArray(value.resources) || value.resources.length > 10) {
+      throw new AiServiceError('AI_INVALID_RESPONSE', 'AI returned invalid learning resources.')
+    }
+    resources = value.resources.map((resource) => {
+      if (!isRecord(resource) || !isText(resource.title) || !isText(resource.type) ||
+        !resourceTypes.has(resource.type) ||
+        !isSafeResourceUrl(resource.url, resource.type) ||
+        (resource.description !== undefined && !isText(resource.description))
+      ) {
+        throw new AiServiceError('AI_INVALID_RESPONSE', 'AI returned invalid learning resources.')
+      }
+      return {
+        title: resource.title,
+        url: resource.url,
+        type: resource.type as 'youtube' | 'article' | 'documentation' | 'course' | 'practice',
+        ...(isText(resource.description) ? { description: resource.description } : {}),
+      }
+    })
+  }
+
   return {
     introduction: value.introduction,
     learningObjectives: value.learningObjectives,
@@ -77,5 +116,6 @@ export function validateGeneratedLearningNotes(value: unknown): GeneratedLearnin
     keyTakeaways: value.keyTakeaways,
     revisionSummary: value.revisionSummary,
     knowledgeChecks,
+    ...(resources ? { resources } : {}),
   }
 }

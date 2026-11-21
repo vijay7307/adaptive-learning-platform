@@ -185,6 +185,12 @@ export interface LearningNoteContent {
     keyTakeaways: string[]
     revisionSummary: string
     knowledgeChecks: Array<{ question: string; answer: string; explanation: string }>
+    resources?: Array<{
+      title: string
+      url: string
+      type: 'youtube' | 'article' | 'documentation' | 'course' | 'practice'
+      description?: string
+    }>
   }
 
 export interface LearningNote {

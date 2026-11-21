@@ -166,6 +166,8 @@ Current frontend routes:
 11. Settings persistence for profile, learning preferences, timezone, study budget, notifications,
    theme, and password changes.
 12. Dashboard live data for curricula, daily targets, and Practice history.
+13. Learning Notes can include validated YouTube and additional external learning resources,
+    rendered on the Learning Notes page in a “Learn more” section.
 
 ## API currently mounted
 

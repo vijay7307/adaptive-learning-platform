@@ -5,6 +5,11 @@ export const learningNotesJsonInstruction = [
   'Each section requires title, explanation, subtopics:string[], examples:string[], codeExamples:array.',
   'Each codeExample requires language, code, explanation, and optional expectedOutput.',
   'Each knowledgeCheck requires question, answer, and explanation. Answers must be correct and directly answer the question.',
+  'Required field: resources:array containing useful, topic-specific external learning links.',
+  'Include at least 2 YouTube video resources and 2 additional resources such as official documentation, articles, courses, or practice pages.',
+  'Each resource requires title, url, type, and optional description. Allowed types are youtube, article, documentation, course, and practice.',
+  'YouTube resource URLs must use https and belong to youtube.com or youtu.be. Use known, stable URLs; do not invent placeholders or unverifiable IDs.',
+  'Additional resource URLs must use https and lead to reputable, directly relevant sources.',
   'Use beginner-friendly explanations, follow the supplied objectives, and avoid unrelated advanced topics.',
   'Include runnable code only when relevant; otherwise return an empty codeExamples array for a section.',
 ].join(' ')

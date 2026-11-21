@@ -28,6 +28,12 @@ const knowledgeCheckSchema = new Schema({
   answer: String,
   explanation: String,
 }, { _id: false })
+const learningResourceSchema = new Schema({
+  title: { type: String, required: true, trim: true },
+  url: { type: String, required: true, trim: true },
+  type: { type: String, required: true, enum: ['youtube', 'article', 'documentation', 'course', 'practice'] },
+  description: { type: String, trim: true },
+}, { _id: false })
 const contentSchema = new Schema({
   introduction: String,
   learningObjectives: [String],
@@ -38,6 +44,7 @@ const contentSchema = new Schema({
   keyTakeaways: [String],
   revisionSummary: String,
   knowledgeChecks: [knowledgeCheckSchema],
+  resources: [learningResourceSchema],
 }, { _id: false })
 
 const schema = new Schema<ILearningNote>({
