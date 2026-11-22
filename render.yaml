@@ -2,9 +2,10 @@ services:
   - type: web
     name: adaptive-learning-api
     runtime: node
+    rootDir: server
     plan: free
-    buildCommand: npm ci --prefix server && npm run server:build
-    startCommand: npm run server:start
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
