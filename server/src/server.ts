@@ -2,9 +2,29 @@ import { createApp } from './app'
 import { config, validateAuthConfig } from './config/env'
 import { connectDB, disconnectDB } from './config/database'
 import { Server } from 'http'
+import { createServer as createNetServer } from 'node:net'
 import { startDailyTargetScheduler, stopDailyTargetScheduler } from './services/daily-target.scheduler'
 
 let server: Server | null = null
+
+async function assertPortAvailable(port: number): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const probe = createNetServer()
+    probe.once('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        reject(new Error(`PORT_IN_USE:${port}`))
+        return
+      }
+      reject(error)
+    })
+    probe.listen(port, () => {
+      probe.close((error) => {
+        if (error) reject(error)
+        else resolve()
+      })
+    })
+  })
+}
 
 async function startServer(): Promise<void> {
   console.log('='.repeat(50))
@@ -23,6 +43,18 @@ async function startServer(): Promise<void> {
     process.exit(1)
   }
 
+  try {
+    await assertPortAvailable(config.port)
+  } catch (error) {
+    if (error instanceof Error && error.message === `PORT_IN_USE:${config.port}`) {
+      console.error(`❌ Port ${config.port} is already in use.`)
+      console.error(`Stop the existing server on port ${config.port}, then restart with "npm run dev".`)
+      process.exit(1)
+    }
+    console.error('[Server] Unable to check whether the HTTP port is available:', error)
+    process.exit(1)
+  }
+
   // Connect to database before accepting requests
   try {
     await connectDB()
@@ -34,11 +66,23 @@ async function startServer(): Promise<void> {
 
   const app = createApp()
 
-  server = app.listen(config.port, () => {
+  server = app.listen(config.port)
+  server.once('listening', () => {
     console.log(`✅ Server successfully listening on port ${config.port}`)
     console.log(`🩺 Health check available at: http://localhost:${config.port}/api/health`)
+    startDailyTargetScheduler()
   })
-  startDailyTargetScheduler()
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${config.port} is already in use.`)
+      console.error(`Stop the existing server on port ${config.port}, then restart with "npm run dev".`)
+      stopDailyTargetScheduler()
+      void disconnectDB().finally(() => process.exit(1))
+      return
+    }
+    console.error('[Server] HTTP server error:', error)
+    void disconnectDB().finally(() => process.exit(1))
+  })
 }
 
 // Graceful shutdown handler

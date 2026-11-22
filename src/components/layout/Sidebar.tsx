@@ -48,8 +48,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <GraduationCap size={18} className="text-white" />
             </div>
             <div>
-              <p className="text-sm font-bold leading-tight tracking-wide text-white">Adaptive</p>
-              <p className="text-xs font-medium leading-tight text-indigo-300">Learning Platform</p>
+              <p className="text-sm font-bold leading-tight tracking-wide text-white">LearnFlow</p>
+              <p className="text-xs font-medium leading-tight text-indigo-300">AI</p>
             </div>
           </div>
           {/* Close button – mobile only */}

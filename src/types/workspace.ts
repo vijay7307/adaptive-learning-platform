@@ -12,11 +12,13 @@ export interface PracticeQuestion {
 export interface PracticeSet {
   _id?: string
   setKey: string
+  curriculum?: string
   topicTitle: string
   topicKey: string
   difficulty: string
   questions: PracticeQuestion[]
   createdAt?: string
+  scheduledAt?: string
 }
 
 export interface PracticeAttempt {
@@ -27,7 +29,15 @@ export interface PracticeAttempt {
   scorePercent?: number
   earnedPoints?: number
   totalPoints?: number
-  questionResults?: Array<{ questionKey: string; feedback: string; score: number; maxScore: number }>
+  questionResults?: Array<{
+    questionKey: string
+    feedback: string
+    score: number
+    maxScore: number
+    mistakes?: string[]
+    correctedSolution?: string
+    suggestedRevisionTopics?: string[]
+  }>
   startedAt: string
   submittedAt?: string
 }
@@ -52,6 +62,8 @@ export interface TestDefinition {
   durationMinutes?: number
   questionCount?: number
   questions?: PracticeQuestion[]
+  createdAt?: string
+  scheduledAt?: string
 }
 
 export interface TestAttempt {
@@ -59,6 +71,17 @@ export interface TestAttempt {
   testKey?: string
   status?: string
   scorePercent?: number
+  score?: number
+  maxScore?: number
   startedAt: string
   submittedAt?: string
+  results?: Array<{
+    questionKey: string
+    score: number
+    maxScore: number
+    feedback?: string
+    mistakes?: string[]
+    correctedSolution?: string
+    suggestedRevisionTopics?: string[]
+  }>
 }

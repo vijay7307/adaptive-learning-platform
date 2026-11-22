@@ -11,7 +11,7 @@ import {
   isAfterLocalFiveAm,
   localDateKeyToStorageDate,
 } from './timezone.service'
-import { allocateDailyStudyMinutes, buildTopicKey } from './daily-target.utils'
+import { allocateDailyStudyMinutes, buildTopicKey, normalizeTargetDurations } from './daily-target.utils'
 import {
   buildDetailedTargetItem,
   validateRegularTargetItems,
@@ -64,8 +64,9 @@ async function generateItems(curriculum: CurriculumDocument, allocatedMinutes: n
         : null
     })
     .filter((item): item is NonNullable<typeof item> => item !== null))
-  validateRegularTargetItems(items, allocatedMinutes)
-  return items
+  const normalizedItems = normalizeTargetDurations(items, allocatedMinutes)
+  validateRegularTargetItems(normalizedItems, allocatedMinutes)
+  return normalizedItems
 }
 
 async function createRegularTarget(
@@ -111,9 +112,15 @@ export async function generateRegularTargetsForUser(
   if (!user) throw new Error('User not found')
   const allocations = allocateDailyStudyMinutes(curricula, user.dailyStudyTimeBudgetMinutes || 180)
   for (const curriculum of curricula) {
-    const existing = await DailyTarget.exists({ owner, curriculum: curriculum._id, localDateKey })
+    const allocatedMinutes = allocations.get(String(curriculum._id)) || 0
+    const existing = await DailyTarget.findOne({ owner, curriculum: curriculum._id, localDateKey })
     if (!existing) {
-      await createRegularTarget(owner, curriculum, localDateKey, allocations.get(String(curriculum._id)) || 0)
+      await createRegularTarget(owner, curriculum, localDateKey, allocatedMinutes)
+    } else if (existing.allocatedMinutes !== allocatedMinutes ||
+      existing.items.reduce((sum, item) => sum + item.estimatedDurationMinutes, 0) > allocatedMinutes) {
+      existing.items = normalizeTargetDurations(existing.items, allocatedMinutes)
+      existing.allocatedMinutes = allocatedMinutes
+      await existing.save()
     }
   }
 }

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertCircle, BookOpen, ChevronDown, ChevronRight, ExternalLink, LoaderCircle, Sparkles, Youtube } from 'lucide-react'
 import { ApiError } from '../services/api'
 import { curriculumService } from '../services/curriculum.service'
+import { dailyTargetService } from '../services/daily-target.service'
 import { learningNotesService } from '../services/learning-notes.service'
-import type { Curriculum, CurriculumModule, CurriculumTopic, LearningNote } from '../types/curriculum'
+import type { Curriculum, CurriculumModule, CurriculumTopic, DailyTargetResponse, LearningNote } from '../types/curriculum'
 import { Badge } from '../components/ui/Badge'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 
@@ -80,6 +81,7 @@ function NoteContent({ note }: { note: LearningNote }) {
 export function NotesPage() {
   const [curricula, setCurricula] = useState<Curriculum[]>([])
   const [notes, setNotes] = useState<LearningNote[]>([])
+  const [todayTargets, setTodayTargets] = useState<DailyTargetResponse | null>(null)
   const [selectedCurriculum, setSelectedCurriculum] = useState('')
   const [selectedTopic, setSelectedTopic] = useState<{ moduleKey: string; topicKey: string; topic: CurriculumTopic } | null>(null)
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
@@ -89,6 +91,16 @@ export function NotesPage() {
   const [error, setError] = useState<string | null>(null)
 
   const curriculum = useMemo(() => curricula.find((item) => item._id === selectedCurriculum), [curricula, selectedCurriculum])
+  const todayTopicKeys = useMemo(() => {
+    if (!selectedCurriculum || !todayTargets) return new Set<string>()
+    const regularKeys = todayTargets.data.targets
+      .filter((target) => target.curriculum === selectedCurriculum)
+      .flatMap((target) => target.items.map((item) => item.topicKey))
+    const extraKeys = todayTargets.data.extraWork?.curriculum === selectedCurriculum
+      ? todayTargets.data.extraWork.items.map((item) => item.topicKey)
+      : []
+    return new Set([...regularKeys, ...extraKeys])
+  }, [selectedCurriculum, todayTargets])
   const latestNote = selectedTopic
     ? notes.filter((note) => note.moduleKey === selectedTopic.moduleKey && note.topicKey === selectedTopic.topicKey).sort((a, b) => b.version - a.version)[0]
     : undefined
@@ -96,10 +108,19 @@ export function NotesPage() {
   useEffect(() => {
     async function load() {
       try {
-        const plans = await curriculumService.list()
+        const [plans, targets] = await Promise.all([
+          curriculumService.list(),
+          dailyTargetService.list(),
+        ])
         const active = plans.data.curricula.filter((item) => item.status === 'draft' || item.status === 'active')
         setCurricula(active)
-        if (active[0]) setSelectedCurriculum(active[0]._id)
+        setTodayTargets(targets)
+        const plannedCurriculum = active.find((item) =>
+          targets.data.targets.some((target) => target.curriculum === item._id) ||
+          targets.data.extraWork?.curriculum === item._id
+        )
+        if (plannedCurriculum) setSelectedCurriculum(plannedCurriculum._id)
+        else if (active[0]) setSelectedCurriculum(active[0]._id)
       } catch (requestError: unknown) { setError(message(requestError)) } finally { setLoading(false) }
     }
     void load()
@@ -108,10 +129,19 @@ export function NotesPage() {
   useEffect(() => {
     if (!selectedCurriculum) return
     setCurrentNote(null)
+    setSelectedTopic(null)
     learningNotesService.list(selectedCurriculum)
       .then((response) => setNotes(response.data.notes))
       .catch((requestError: unknown) => setError(message(requestError)))
   }, [selectedCurriculum])
+
+  useEffect(() => {
+    if (!curriculum) return
+    const moduleKeys = curriculum.modules
+      .filter((module) => module.topics.some((topic) => todayTopicKeys.has(topicKey(module, topic))))
+      .map((module) => String(module.order))
+    setExpandedModules(new Set(moduleKeys))
+  }, [curriculum, todayTopicKeys])
 
   function selectTopic(module: CurriculumModule, topic: CurriculumTopic) {
     const selected = { moduleKey: String(module.order), topicKey: topicKey(module, topic), topic }
@@ -139,12 +169,59 @@ export function NotesPage() {
       <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
         <Card><CardHeader title="Topics" subtitle="Select a planner and topic" /><CardBody className="space-y-3">
           <select value={selectedCurriculum} onChange={(event) => { setSelectedCurriculum(event.target.value); setSelectedTopic(null) }} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
-            {curricula.map((item) => <option key={item._id} value={item._id}>{item.goal}</option>)}
+            {curricula
+              .filter((item) =>
+                todayTargets?.data.targets.some((target) => target.curriculum === item._id) ||
+                todayTargets?.data.extraWork?.curriculum === item._id
+              )
+              .map((item) => <option key={item._id} value={item._id}>{item.goal}</option>)}
           </select>
           {!curriculum && <p className="text-sm text-slate-500">Create a planner to begin.</p>}
+          {todayTopicKeys.size === 0 && (
+            <p className="rounded-lg border border-slate-100 p-3 text-sm text-slate-500">
+              No topics are scheduled for today.
+            </p>
+          )}
           {curriculum?.modules.map((module) => {
-            const key = String(module.order); const expanded = expandedModules.has(key)
-            return <div key={key} className="rounded-lg border border-slate-100"><button type="button" className="flex w-full items-center gap-2 p-3 text-left text-sm font-medium" onClick={() => setExpandedModules((current) => { const next = new Set(current); expanded ? next.delete(key) : next.add(key); return next })}>{expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}{module.title}</button>{expanded && <div className="border-t border-slate-100 p-2">{module.topics.map((topic) => { const keyValue = topicKey(module, topic); const done = curriculum.completedTopicKeys.includes(keyValue); return <button type="button" key={keyValue} onClick={() => selectTopic(module, topic)} className={`w-full rounded-md px-2 py-2 text-left text-xs ${selectedTopic?.topicKey === keyValue ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>{done ? '✓ ' : ''}{topic.title}</button> })}</div>}</div>
+            const topics = module.topics.filter((topic) => todayTopicKeys.has(topicKey(module, topic)))
+            if (topics.length === 0) return null
+            const key = String(module.order)
+            const expanded = expandedModules.has(key)
+            return (
+              <div key={key} className="rounded-lg border border-slate-100">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 p-3 text-left text-sm font-medium"
+                  onClick={() => setExpandedModules((current) => {
+                    const next = new Set(current)
+                    expanded ? next.delete(key) : next.add(key)
+                    return next
+                  })}
+                >
+                  {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  {module.title}
+                </button>
+                {expanded && (
+                  <div className="border-t border-slate-100 p-2">
+                    {topics.map((topic) => {
+                      const keyValue = topicKey(module, topic)
+                      const done = curriculum.completedTopicKeys.includes(keyValue)
+                      return (
+                        <button
+                          type="button"
+                          key={keyValue}
+                          onClick={() => selectTopic(module, topic)}
+                          className={`w-full rounded-md px-2 py-2 text-left text-xs ${selectedTopic?.topicKey === keyValue ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}
+                        >
+                          {done ? '✓ ' : ''}
+                          {topic.title}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
           })}
         </CardBody></Card>
         <Card><CardHeader title={selectedTopic?.topic.title || 'Select a topic'} subtitle={selectedTopic ? `${curriculum?.goal} · ${selectedTopic.topic.learningObjectives.join(' ')}` : 'Choose a topic from the planner'} action={selectedTopic && <Badge variant={currentNote || latestNote ? 'success' : 'info'}>{currentNote || latestNote ? 'Saved' : 'Not generated'}</Badge>} /><CardBody>

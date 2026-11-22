@@ -2,7 +2,16 @@ import mongoose, { Document, Schema, Types } from 'mongoose'
 
 export type TestAttemptStatus = 'in_progress' | 'submitted' | 'evaluated' | 'interrupted'
 export interface ITestAnswer { questionKey: string; answer: string }
-export interface ITestResult { questionKey: string; score: number; maxScore: number; feedback?: string; correctness: 'correct' | 'partial' | 'incorrect' }
+export interface ITestResult {
+  questionKey: string
+  score: number
+  maxScore: number
+  feedback?: string
+  mistakes?: string[]
+  correctedSolution?: string
+  suggestedRevisionTopics?: string[]
+  correctness: 'correct' | 'partial' | 'incorrect'
+}
 export interface ITestAttempt {
   attemptKey: string
   owner: Types.ObjectId
@@ -19,7 +28,16 @@ export interface ITestAttempt {
 }
 export type TestAttemptDocument = Document<unknown, object, ITestAttempt> & ITestAttempt
 const answerSchema = new Schema<ITestAnswer>({ questionKey: { type: String, required: true }, answer: { type: String, maxlength: 20000, required: true } }, { _id: false, strict: 'throw' })
-const resultSchema = new Schema<ITestResult>({ questionKey: { type: String, required: true }, score: { type: Number, min: 0, required: true }, maxScore: { type: Number, min: 1, required: true }, feedback: String, correctness: { type: String, enum: ['correct', 'partial', 'incorrect'], required: true } }, { _id: false, strict: 'throw' })
+const resultSchema = new Schema<ITestResult>({
+  questionKey: { type: String, required: true },
+  score: { type: Number, min: 0, required: true },
+  maxScore: { type: Number, min: 1, required: true },
+  feedback: String,
+  mistakes: { type: [String], default: undefined },
+  correctedSolution: String,
+  suggestedRevisionTopics: { type: [String], default: undefined },
+  correctness: { type: String, enum: ['correct', 'partial', 'incorrect'], required: true },
+}, { _id: false, strict: 'throw' })
 const schema = new Schema<ITestAttempt>({
   attemptKey: { type: String, required: true, unique: true, immutable: true },
   owner: { type: Schema.Types.ObjectId, ref: 'User', required: true, immutable: true },

@@ -6,6 +6,7 @@ import { calculateAttemptScore, classifyScore, scoreMcqAnswer } from './practice
 import type { LearnerPracticeEvidence, PracticeAttempt, PracticeSet } from './practice.types'
 import { recalculateWeakTopicSummary } from './practice.weak-topics'
 import { validateEvaluationResult, validateGeneratedPracticeSet } from './practice.validation'
+import { createFallbackEvaluation } from './practice.service'
 
 const validQuestion = {
   questionKey: 'q1',
@@ -53,6 +54,40 @@ test('allows fully correct evaluations with empty mistakes and revision topics',
   }, 2)
   assert.deepEqual(result.mistakes, [])
   assert.deepEqual(result.suggestedRevisionTopics, [])
+})
+
+test('fallback evaluation awards full marks for a complete answer', () => {
+  const question = {
+    questionKey: 'q-fallback',
+    type: 'short-answer' as const,
+    prompt: 'Explain text types and give an example.',
+    learningObjectives: ['Identify text types', 'Use string examples'],
+    difficulty: 'beginner' as const,
+    points: 10,
+    evaluationRubric: ['Defines string values', 'Provides a correct example'],
+    evaluationCriteria: ['Accuracy', 'Completeness', 'Application'],
+  }
+  const result = createFallbackEvaluation(question, 'A string is a text value. For example, the variable name should contain text such as "Ada".')
+  assert.equal(result.score, 10)
+  assert.equal(result.correctness, 'correct')
+  assert.deepEqual(result.mistakes, [])
+})
+
+test('fallback evaluation recognizes an exact coding reference solution', () => {
+  const question = {
+    questionKey: 'q-code',
+    type: 'coding' as const,
+    prompt: 'Return the sum of two numbers.',
+    learningObjectives: ['Use addition'],
+    difficulty: 'beginner' as const,
+    points: 10,
+    evaluationRubric: ['Adds both numbers'],
+    referenceSolution: 'function add(a, b) { return a + b; }',
+    evaluationCriteria: ['Accuracy', 'Output'],
+  }
+  const result = createFallbackEvaluation(question, 'function add(a, b) { return a + b; }')
+  assert.equal(result.score, 10)
+  assert.equal(result.correctness, 'correct')
 })
 
 test('requires classification to match every score boundary', () => {

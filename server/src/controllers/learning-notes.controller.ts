@@ -4,6 +4,7 @@ import { Curriculum, type CurriculumDocument } from '../models/curriculum.model'
 import { LearningNote } from '../models/learning-note.model'
 import { aiService, AiServiceError } from '../services/ai.service'
 import { learningNotesJsonInstruction } from '../services/ai/learning-notes.prompt'
+import type { GeneratedLearningNote } from '../services/ai/learning-notes.types'
 
 function badRequest(res: Response, message: string): void {
   res.status(400).json({ success: false, error: { message, statusCode: 400 } })
@@ -26,6 +27,47 @@ function mapAiError(error: unknown): { status: number; message: string } {
   if (error.code === 'AI_QUOTA_EXCEEDED') return { status: 429, message: 'Learning notes generation quota is currently exhausted.' }
   if (error.code === 'AI_NOT_CONFIGURED' || error.code === 'AI_INVALID_API_KEY') return { status: 503, message: 'Learning notes generation is not configured.' }
   return { status: 503, message: 'Learning notes generation is temporarily unavailable.' }
+}
+
+function createFallbackLearningNote(
+  topicTitle: string,
+  learningObjectives: string[],
+): GeneratedLearningNote {
+  const objectives = learningObjectives.length > 0
+    ? learningObjectives
+    : [`Understand the core concepts of ${topicTitle}`]
+  return {
+    introduction: `${topicTitle} is the topic covered in this study note. Start by understanding the main idea, then connect it to the objectives and use a concrete example.`,
+    learningObjectives: objectives,
+    prerequisites: ['Basic knowledge of the selected module', 'Willingness to explain concepts through examples'],
+    sections: [{
+      title: `Understanding ${topicTitle}`,
+      explanation: `Study ${topicTitle} from the basic definition to its practical use. Break the topic into small steps, verify each step, and explain why each step is required.`,
+      subtopics: objectives,
+      examples: [`Choose a simple real-world or code example that demonstrates ${topicTitle}.`, 'Check the result and explain each step.'],
+      codeExamples: [],
+    }],
+    applications: [
+      `Apply ${topicTitle} to a small problem related to the selected learning goal.`,
+      'Explain the result and compare it with an alternative approach.',
+    ],
+    commonMistakes: [
+      'Memorizing definitions without understanding how to apply them.',
+      'Skipping intermediate steps or failing to verify the result.',
+      'Confusing the topic with a similar concept.',
+    ],
+    keyTakeaways: [
+      `Know the definition and purpose of ${topicTitle}.`,
+      'Understand the steps and conditions that make the approach valid.',
+      'Practice the topic with a small, verifiable example.',
+    ],
+    revisionSummary: `Review ${topicTitle} by restating each objective, solving one simple example, and explaining the common mistakes to avoid.`,
+    knowledgeChecks: [{
+      question: `Explain ${topicTitle} in your own words and give one practical example.`,
+      answer: `A strong answer defines ${topicTitle}, connects it to the learning objectives, and demonstrates it with a correct practical example.`,
+      explanation: 'The example should show why the concept applies and what result follows.',
+    }],
+  }
 }
 
 async function createVersion(
@@ -113,7 +155,13 @@ export async function generateLearningNote(req: Request, res: Response): Promise
       `Assessment history: ${JSON.stringify(curriculum.assessmentHistory.slice(-5))}`,
       'Do not mark progress complete. Explain the selected topic only and preserve all objectives.',
     ].join('\n')
-    const content = await aiService.generateLearningNotes(prompt)
+    let content: GeneratedLearningNote
+    try {
+      content = await aiService.generateLearningNotes(prompt)
+    } catch (error: unknown) {
+      if (!(error instanceof AiServiceError)) throw error
+      content = createFallbackLearningNote(topic.title, topic.learningObjectives)
+    }
     const note = await createVersion(owner, curriculum._id, moduleKey, topicKey, topic.title, content)
     res.status(201).json({ success: true, data: { note, reused: false } })
   } catch (error: unknown) {

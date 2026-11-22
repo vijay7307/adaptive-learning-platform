@@ -1,4 +1,4 @@
-import { Menu, Bell, Search, LogOut } from 'lucide-react'
+import { Menu, Bell, LogOut } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { navItems } from '../../config/navigation'
 import { useAuth } from '../../context/AuthContext'
@@ -28,22 +28,11 @@ export function TopNav({ onMenuClick }: TopNavProps) {
       {/* Page title */}
       <div className="flex-1">
         <h1 className="text-base font-semibold text-slate-800 sm:text-lg">
-          {currentPage?.label ?? 'Adaptive Learning'}
+          {currentPage?.label ?? 'LearnFlow AI'}
         </h1>
         {currentPage?.description && (
           <p className="hidden text-xs text-slate-500 sm:block">{currentPage.description}</p>
         )}
-      </div>
-
-      {/* Search */}
-      <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:flex">
-        <Search size={16} className="text-slate-400" />
-        <input
-          type="search"
-          placeholder="Search topics, notes…"
-          className="w-48 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-          aria-label="Search"
-        />
       </div>
 
       {/* Notification bell */}

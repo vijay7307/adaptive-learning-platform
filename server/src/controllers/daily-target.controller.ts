@@ -7,7 +7,7 @@ import { DailyTargetGenerationJob } from '../models/daily-target-generation-job.
 import { User } from '../models/user.model'
 import { aiService } from '../services/ai.service'
 import { AiServiceError } from '../services/ai/contracts'
-import { allocateDailyStudyMinutes, buildTopicKey, EXTRA_WORK_RESERVE_MINUTES } from '../services/daily-target.utils'
+import { allocateDailyStudyMinutes, buildTopicKey, EXTRA_WORK_RESERVE_MINUTES, normalizeTargetDurations } from '../services/daily-target.utils'
 import { getLocalDateKey, getUserTimezone, localDateKeyToStorageDate } from '../services/timezone.service'
 import {
   buildDetailedTargetItem,
@@ -92,10 +92,20 @@ export async function listDailyTargets(req: Request, res: Response): Promise<voi
   ])
   const targetMap = new Map(existingTargets.map((target) => [String(target.curriculum), target]))
   const allocations = allocateDailyStudyMinutes(curricula, user?.dailyStudyTimeBudgetMinutes || 180)
-  const targets = await Promise.all(curricula.map(async (curriculum) =>
-    targetMap.get(String(curriculum._id)) ||
-    createTarget(owner, curriculum, localDateKeyToStorageDate(localDateKey), localDateKey, allocations.get(String(curriculum._id)) || 0),
-  ))
+  const targets = await Promise.all(curricula.map(async (curriculum) => {
+    const allocatedMinutes = allocations.get(String(curriculum._id)) || 0
+    const existing = targetMap.get(String(curriculum._id))
+    if (!existing) {
+      return createTarget(owner, curriculum, localDateKeyToStorageDate(localDateKey), localDateKey, allocatedMinutes)
+    }
+    const totalMinutes = existing.items.reduce((sum, item) => sum + item.estimatedDurationMinutes, 0)
+    if (existing.allocatedMinutes !== allocatedMinutes || totalMinutes > allocatedMinutes) {
+      existing.items = normalizeTargetDurations(existing.items, allocatedMinutes)
+      existing.allocatedMinutes = allocatedMinutes
+      await existing.save()
+    }
+    return existing
+  }))
   const generationJobExists = await DailyTargetGenerationJob.exists({ owner, localDateKey })
   if (!generationJobExists && targets.length === curricula.length) {
     try {

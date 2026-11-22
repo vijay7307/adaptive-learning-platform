@@ -108,7 +108,7 @@ practiceSetSchema.pre('validate', function (next) {
       if (!question.correctAnswer || optionKeys.filter((key) => key === question.correctAnswer).length !== 1) {
         this.invalidate('questions', 'MCQ correctAnswer must match exactly one option key.')
       }
-    } else if (question.options !== undefined || question.correctAnswer !== undefined) {
+    } else if ((question.options?.length || 0) > 0 || question.correctAnswer !== undefined) {
       this.invalidate('questions', 'Only MCQ questions may contain options or correctAnswer.')
     }
     if (question.type === 'coding' && !question.referenceSolution?.trim()) {

@@ -21,6 +21,7 @@ export interface ITest {
   topicKey?: string
   difficulty: TestDifficulty
   durationMinutes: number
+  scheduledAt?: Date
   questions: ITestQuestion[]
   createdAt: Date
   updatedAt: Date
@@ -46,6 +47,7 @@ const schema = new Schema<ITest>({
   topicKey: { type: String, trim: true, immutable: true },
   difficulty: { type: String, enum: ['beginner', 'intermediate', 'advanced'], required: true, immutable: true },
   durationMinutes: { type: Number, min: 1, max: 480, required: true, immutable: true },
+  scheduledAt: { type: Date, immutable: true },
   questions: { type: [questionSchema], required: true, immutable: true },
 }, { timestamps: true, strict: 'throw' })
 

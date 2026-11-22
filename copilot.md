@@ -163,11 +163,26 @@ Current frontend routes:
 9. Shared Learning Context retrieval from persisted curriculum, targets, practice, feedback, and
    test records.
 10. Test Center models, generation, timed/interrupted attempts, backend evaluation, results, and history.
+    Generated tests carry an immutable `scheduledAt` (currently seven days after generation);
+    the catalog exposes `nextTestAt`, the UI shows availability, and early starts are rejected
+    by the backend. Test answers support text/code file upload through client-side text reading,
+    exact answer coverage validation, and explicit review with marks, mistakes, corrected solutions,
+    and revision topics. Weak Practice signals are included in Test generation context.
 11. Settings persistence for profile, learning preferences, timezone, study budget, notifications,
    theme, and password changes.
 12. Dashboard live data for curricula, daily targets, and Practice history.
 13. Learning Notes can include validated YouTube and additional external learning resources,
     rendered on the Learning Notes page in a “Learn more” section.
+14. Learning Notes topic selection is restricted to topics appearing in today's regular or Extra
+    Work targets for the selected curriculum.
+15. Daily target allocations are capped by each curriculum's requested daily study time. A
+    one-hour planner receives 60 minutes even when the user's shared daily budget is larger,
+    and existing target durations are normalized against the corrected allocation.
+16. Practice now automatically provisions one short practice set per topic in the current day's
+    regular or Extra Work targets when the Practice page loads. Existing same-day sets are reused
+    to avoid duplicate AI generation. Learners can write or upload text/code solutions, submit
+    exact answers, and request backend AI review with marks, mistakes, corrected solutions, and
+    revision topics.
 
 ## API currently mounted
 
@@ -262,6 +277,18 @@ The later Practice design requirements were:
 4. Preserve the completed workspace integrations unless the task explicitly asks for changes.
 5. Run focused tests first, then the backend/frontend checks required by the task.
 
+Latest verified checks:
+
+- `npm --prefix server test`: 61 passed, 0 failed.
+- `npm --prefix server run lint`: passed.
+- `npm --prefix server run build`: passed.
+- `npm run lint`: passed.
+- `npm run build`: passed (Vite emitted only the existing large-chunk warning).
+
+The current scheduling rule is an implementation assumption: tests are initially scheduled seven
+days after generation, with `nextTestAt` derived from the earliest future schedule or the latest
+evaluated attempt. Refine this only if product requirements specify a different progress-based rule.
+
 ## Irrelevant or stale files
 
 - The user-attached file
@@ -272,6 +299,8 @@ The later Practice design requirements were:
   and the actual checkout as the current source of truth.
 - `src/pages/AnalyticsPage.tsx` still uses the existing `PlaceholderPage`; Analytics is outside the
   six requested workspaces and was not replaced in this batch.
+- Test solution uploads currently read supported text/code files in the browser and submit their
+  text; PDF/image/OCR uploads are not implemented.
 - `dist/` and `node_modules/` are generated/dependency directories; do not edit or treat them as
   application source.
 
