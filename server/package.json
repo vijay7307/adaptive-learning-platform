@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "node node_modules/typescript/bin/tsc",
     "start": "node dist/server.js",
     "lint": "tsc --noEmit",
     "test": "node --import tsx --test src/services/*.test.ts src/controllers/*.test.ts",
@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@google/genai": "^2.32.0",
-    "adaptive-learning-platform": "file:..",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
