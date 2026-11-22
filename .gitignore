@@ -28,3 +28,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# MongoDB integration database
+.integration-mongodb/
+
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.*
