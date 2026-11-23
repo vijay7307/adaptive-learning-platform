@@ -19,6 +19,8 @@ export interface ITest {
   curriculum: Types.ObjectId
   moduleKey: string
   topicKey?: string
+  source?: 'manual' | 'milestone'
+  milestoneKey?: string
   difficulty: TestDifficulty
   durationMinutes: number
   scheduledAt?: Date
@@ -45,6 +47,8 @@ const schema = new Schema<ITest>({
   curriculum: { type: Schema.Types.ObjectId, ref: 'Curriculum', required: true, immutable: true },
   moduleKey: { type: String, required: true, trim: true, immutable: true },
   topicKey: { type: String, trim: true, immutable: true },
+  source: { type: String, enum: ['manual', 'milestone'], default: 'manual', immutable: true },
+  milestoneKey: { type: String, trim: true, immutable: true },
   difficulty: { type: String, enum: ['beginner', 'intermediate', 'advanced'], required: true, immutable: true },
   durationMinutes: { type: Number, min: 1, max: 480, required: true, immutable: true },
   scheduledAt: { type: Date, immutable: true },
@@ -65,5 +69,6 @@ schema.pre('validate', function (next) {
 schema.pre(['updateOne', 'updateMany', 'findOneAndUpdate'], function (next) { next(new Error('Tests are immutable.')) })
 schema.index({ owner: 1, curriculum: 1, createdAt: -1 })
 schema.index({ owner: 1, moduleKey: 1, topicKey: 1 })
+schema.index({ owner: 1, curriculum: 1, milestoneKey: 1 }, { unique: true, sparse: true })
 
 export const Test = mongoose.model<ITest>('Test', schema)

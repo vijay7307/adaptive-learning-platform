@@ -57,6 +57,8 @@ export interface FeedbackEntry {
 
 export interface TestDefinition {
   testKey: string
+  source?: 'manual' | 'milestone'
+  milestoneKey?: string
   title: string
   description?: string
   durationMinutes?: number

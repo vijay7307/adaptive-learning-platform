@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import mongoose from 'mongoose'
-import { Curriculum } from '../models/curriculum.model'
+import { Curriculum, type CurriculumDocument } from '../models/curriculum.model'
 import { Test } from '../models/test.model'
 import { TestAttempt, type ITestResult } from '../models/test-attempt.model'
 import { LearnerPracticeSignal } from '../models/learner-practice-signal.model'
@@ -17,7 +17,46 @@ const oid = (value: string, field: string) => {
 }
 type Owner = mongoose.Types.ObjectId
 
+export function getNewlyCompletedModules(
+  curriculum: CurriculumDocument,
+  previousCompletedTopicKeys: string[],
+): Array<CurriculumDocument['modules'][number]> {
+  const previous = new Set(previousCompletedTopicKeys)
+  const completed = new Set(curriculum.completedTopicKeys)
+  return curriculum.modules.filter((module) => {
+    const topicKeys = module.topics.map((topic) => `${module.order}:${topic.order}`)
+    return topicKeys.length > 0 &&
+      topicKeys.every((topicKey) => completed.has(topicKey)) &&
+      topicKeys.some((topicKey) => !previous.has(topicKey))
+  })
+}
+
 export class TestService {
+  async generateForCompletedMilestones(
+    owner: Owner,
+    curriculum: CurriculumDocument,
+    previousCompletedTopicKeys: string[],
+  ): Promise<void> {
+    for (const module of getNewlyCompletedModules(curriculum, previousCompletedTopicKeys)) {
+      const milestoneKey = `${curriculum._id}:module:${module.order}`
+      if (await Test.exists({ owner, curriculum: curriculum._id, milestoneKey })) continue
+      try {
+        await this.generate(owner, {
+          curriculumId: String(curriculum._id),
+          moduleKey: String(module.order),
+          difficulty: curriculum.currentSkillLevel,
+          questionCount: 10,
+          durationMinutes: 60,
+          source: 'milestone',
+          milestoneKey,
+          scheduledAt: new Date(),
+        })
+      } catch (error) {
+        if ((error as { code?: number }).code !== 11000) throw error
+      }
+    }
+  }
+
   async generate(owner: Owner, raw: GenerateTestInput) {
     try { validateGenerateTestInput(raw) } catch (e) { throw new TestServiceError(400, (e as Error).message) }
     const curriculum = await Curriculum.findOne({ _id: oid(raw.curriculumId, 'curriculumId'), owner })
@@ -34,7 +73,7 @@ export class TestService {
       return {
         questionKey: q.questionKey || `q-${index + 1}`, type: q.type === 'short-answer' ? 'descriptive' as const : 'mcq' as const,
         prompt: q.prompt, options: q.options, correctAnswer: q.correctAnswer,
-        rubric: q.evaluationRubric, points: q.points, topicKey: raw.topicKey ?? `${raw.moduleKey}:all`,
+        rubric: q.evaluationRubric, points: 1, topicKey: raw.topicKey ?? `${raw.moduleKey}:all`,
       }
     })
     const test = await Test.create({
@@ -43,9 +82,11 @@ export class TestService {
       curriculum: curriculum._id,
       moduleKey: raw.moduleKey,
       topicKey: raw.topicKey,
+      source: raw.source ?? 'manual',
+      ...(raw.milestoneKey ? { milestoneKey: raw.milestoneKey } : {}),
       difficulty: raw.difficulty,
       durationMinutes: raw.durationMinutes,
-      scheduledAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      scheduledAt: raw.scheduledAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       questions,
     })
     return toTestDto(test)

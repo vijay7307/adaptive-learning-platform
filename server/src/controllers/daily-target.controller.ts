@@ -13,6 +13,7 @@ import {
   buildDetailedTargetItem,
   validateExtraTargetItems,
 } from '../services/daily-target-quality.service'
+import { testService } from '../services/test.service'
 
 function requestedDate(value: string | undefined, timezone: string): string {
   const date = value ? new Date(value) : new Date()
@@ -344,6 +345,7 @@ export async function updateDailyTargetItem(req: Request, res: Response): Promis
 
   const curriculum = await Curriculum.findOne({ _id: target.curriculum, owner })
   if (curriculum) {
+    const previousCompletedTopicKeys = [...curriculum.completedTopicKeys]
     const historyDate = target.targetDate
     let history = curriculum.targetHistory.find(
       (entry) => entry.date.getTime() === historyDate.getTime(),
@@ -371,6 +373,15 @@ export async function updateDailyTargetItem(req: Request, res: Response): Promis
     if (nextStatus === 'completed') history.completedTopicKeys.push(itemKey)
     if (nextStatus === 'missed') history.missedTopicKeys.push(itemKey)
     await curriculum.save()
+    try {
+      await testService.generateForCompletedMilestones(owner, curriculum, previousCompletedTopicKeys)
+    } catch (error) {
+      console.error('[Tests] Milestone test generation failed', {
+        owner: owner.toString(),
+        curriculumId: String(curriculum._id),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
   }
   res.status(200).json({ success: true, data: { target } })
 }

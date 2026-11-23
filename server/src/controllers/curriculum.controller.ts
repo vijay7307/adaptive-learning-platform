@@ -5,6 +5,7 @@ import { User } from '../models/user.model'
 import { aiService, AiServiceError } from '../services/ai.service'
 import { curriculumJsonInstruction } from '../services/ai/curriculum.prompt'
 import { generateTargetsForNewPlanner } from '../services/daily-target-generation.service'
+import { testService } from '../services/test.service'
 
 const MINUTES_PER_DAY = 15
 const MAX_MINUTES_PER_DAY = 24 * 60
@@ -410,12 +411,26 @@ export async function updateCurriculumProgress(req: Request, res: Response): Pro
     res.status(404).json({ success: false, error: { message: 'Curriculum not found.', statusCode: 404 } })
     return
   }
+  const previousCompletedTopicKeys = [...curriculum.completedTopicKeys]
   const totalTopics = curriculum.modules.reduce((total, module) => total + module.topics.length, 0)
   curriculum.completedTopicKeys = [...new Set(completedTopicKeys)]
   curriculum.progressPercent = totalTopics === 0
     ? 0
     : Math.min(100, Math.round((curriculum.completedTopicKeys.length / totalTopics) * 100))
   await curriculum.save()
+  try {
+    await testService.generateForCompletedMilestones(
+      new mongoose.Types.ObjectId(String(req.user._id)),
+      curriculum,
+      previousCompletedTopicKeys,
+    )
+  } catch (error) {
+    console.error('[Tests] Milestone test generation failed', {
+      owner: String(req.user._id),
+      curriculumId: String(curriculum._id),
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
   res.status(200).json({ success: true, data: { curriculum } })
 }
 
