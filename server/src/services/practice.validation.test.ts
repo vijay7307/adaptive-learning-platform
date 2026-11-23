@@ -90,6 +90,38 @@ test('fallback evaluation recognizes an exact coding reference solution', () => 
   assert.equal(result.correctness, 'correct')
 })
 
+test('fallback evaluation gives random text no credit', () => {
+  const question = {
+    questionKey: 'q-random',
+    type: 'short-answer' as const,
+    prompt: 'Explain text types and give an example.',
+    learningObjectives: ['Identify text types', 'Use string examples'],
+    difficulty: 'beginner' as const,
+    points: 10,
+    evaluationRubric: ['Defines string values', 'Provides a correct example'],
+    evaluationCriteria: ['Accuracy', 'Completeness', 'Application'],
+  }
+  const result = createFallbackEvaluation(question, 'random text that does not answer the question')
+  assert.equal(result.score, 0)
+  assert.equal(result.correctness, 'incorrect')
+})
+
+test('fallback evaluation gives repeated garbage no credit', () => {
+  const question = {
+    questionKey: 'q-garbage',
+    type: 'practical' as const,
+    prompt: 'Explain how to sort an array.',
+    learningObjectives: ['Understand sorting'],
+    difficulty: 'beginner' as const,
+    points: 10,
+    evaluationRubric: ['Uses a sorting step'],
+    evaluationCriteria: ['Accuracy', 'Process'],
+  }
+  const result = createFallbackEvaluation(question, 'blah blah blah blah blah')
+  assert.equal(result.score, 0)
+  assert.equal(result.correctness, 'incorrect')
+})
+
 test('requires classification to match every score boundary', () => {
   assert.equal(classifyScore(0, 4), 'incorrect')
   assert.equal(classifyScore(2.99, 4), 'partially_correct')

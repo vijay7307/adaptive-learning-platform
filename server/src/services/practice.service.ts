@@ -141,7 +141,7 @@ export function createFallbackEvaluation(
     ? 0.5
     : matchedObjectiveTokens / objectiveTokens.size
   const wordCount = normalized.split(/\s+/).filter(Boolean).length
-
+  const uniqueWordCount = new Set(normalized.split(/\s+/).filter(Boolean)).size
   let referenceCoverage = 0
   if (question.referenceSolution) {
     const referenceTokens = tokens(question.referenceSolution)
@@ -150,20 +150,36 @@ export function createFallbackEvaluation(
       ? 0
       : matchedReferenceTokens / referenceTokens.size
   }
+  const isRepeatedOrGarbled =
+    wordCount > 0 &&
+    (
+      (wordCount >= 3 && uniqueWordCount / wordCount < 0.35) ||
+      (answer.trim().length >= 8 && !/[a-z0-9+#]/i.test(answer))
+    )
+  const lowEvidence =
+    wordCount < 3 ||
+    isRepeatedOrGarbled ||
+    (answerTokens.size > 0 && matchedObjectiveTokens === 0 && referenceCoverage < 0.2)
 
   const exactReference =
     Boolean(question.referenceSolution) &&
     normalized.replace(/\s+/g, '') === question.referenceSolution!.trim().toLowerCase().replace(/\s+/g, '')
   const highQuality =
-    exactReference ||
-    (wordCount >= 15 && objectiveCoverage >= 0.25) ||
-    (wordCount >= 15 && matchedObjectiveTokens >= 2) ||
-    (referenceCoverage >= 0.7 && wordCount >= 8)
+    !lowEvidence &&
+    (
+      exactReference ||
+      (wordCount >= 15 && matchedObjectiveTokens >= 2) ||
+      (referenceCoverage >= 0.7 && wordCount >= 8)
+    )
   const ratio = highQuality
     ? 1
-    : objectiveCoverage >= 0.25
-      ? 0.75
-      : 0.35
+    : lowEvidence
+      ? 0
+      : objectiveCoverage >= 0.45 && matchedObjectiveTokens >= 2
+        ? 0.75
+        : objectiveCoverage >= 0.2 && matchedObjectiveTokens >= 1
+          ? 0.35
+          : 0
   const score = Math.max(0, Math.min(question.points, Math.round(question.points * ratio)))
   return {
     questionKey: question.questionKey,
@@ -532,7 +548,9 @@ export class PracticeService {
           evaluation = createFallbackEvaluation(question, answer.answer)
         }
         const localEvaluation = createFallbackEvaluation(question, answer.answer)
-        if (localEvaluation.score >= evaluation.score) {
+        if (localEvaluation.score === 0) {
+          evaluation = localEvaluation
+        } else if (localEvaluation.score > evaluation.score) {
           evaluation = localEvaluation
         }
         if (evaluation.questionKey !== question.questionKey) {

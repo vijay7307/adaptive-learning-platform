@@ -32,6 +32,7 @@ export type AiProviderErrorCode =
 export interface AiGenerationRequest {
   prompt: string
   maxOutputTokens: number
+  responseSchema?: unknown
 }
 
 export interface AiUsage {

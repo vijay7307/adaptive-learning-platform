@@ -66,7 +66,7 @@ export class GeminiProvider implements AiProvider {
         contents: request.prompt,
         config: {
           responseMimeType: 'application/json',
-          responseSchema: curriculumResponseSchema,
+        responseSchema: (request.responseSchema as Schema | undefined) || curriculumResponseSchema,
           maxOutputTokens: request.maxOutputTokens,
         },
       })

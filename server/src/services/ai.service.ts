@@ -14,6 +14,7 @@ import { validateEvaluationResult, validateGeneratedPracticeSet } from './practi
 import type { PracticeEvaluationResult } from './practice.types'
 import { GeminiProvider, type GenerativeModelClient } from './ai/providers/gemini.provider'
 import { OpenAiCompatibleProvider } from './ai/providers/openai-compatible.provider'
+import { practiceEvaluationResponseSchema, practiceSetResponseSchema } from './ai/practice.schema'
 
 export { AiServiceError }
 export { validateGeneratedCurriculum }
@@ -271,16 +272,16 @@ export class AiService {
   }
 
   async generatePracticeSet(prompt: string) {
-    const response = await this.generateStructured(prompt, 'practice set')
+    const response = await this.generateStructured(prompt, 'practice set', practiceSetResponseSchema)
     return validateGeneratedPracticeSet(response)
   }
 
   async evaluatePracticeAnswer(prompt: string, maxScore: number): Promise<PracticeEvaluationResult> {
-    const response = await this.generateStructured(prompt, 'practice evaluation')
+    const response = await this.generateStructured(prompt, 'practice evaluation', practiceEvaluationResponseSchema)
     return validateEvaluationResult(response, maxScore)
   }
 
-  private async generateStructured(prompt: string, responseName: string): Promise<unknown> {
+  private async generateStructured(prompt: string, responseName: string, responseSchema?: unknown): Promise<unknown> {
     if (!isNonEmptyString(prompt) || prompt.length > config.aiMaxPromptCharacters) {
       throw new AiServiceError('AI_INVALID_RESPONSE', 'AI request is invalid.')
     }
@@ -298,7 +299,7 @@ export class AiService {
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         providerAttempts += 1
         try {
-          const result = await provider.generate({ prompt, maxOutputTokens: config.aiMaxOutputTokens })
+          const result = await provider.generate({ prompt, maxOutputTokens: config.aiMaxOutputTokens, responseSchema })
           this.lastMetadata = { provider: result.provider, model: result.model, latencyMs: result.latencyMs, usage: result.usage }
           return parseResponse(result.text)
         } catch (error) {
